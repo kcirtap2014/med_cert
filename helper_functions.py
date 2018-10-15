@@ -135,7 +135,8 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
 
     extracted = extract_name(filename)
     # (athle running) for license FFA
-    keywords = extracted[:-1] + [("athle", "running", "course", "pied", "compétition")]
+    keywords = extracted[:-1] + [("athle", "running", "course",
+                                  "pied", "compétition", "athlétisme")]
     keywords_preprocessed = []
 
     # prprocess keywords, special processing for tuples, make everything
@@ -170,7 +171,7 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
             if i == 2:
                 #check for dates, condition of date match has to be modified for
                 # production
-                begin_date = pd.to_datetime(begin_date)
+                begin_date = pd.to_datetime(begin_date, format ='%d/%m/%Y')
 
                 # we don't need to specify end date, if the begin time is more
                 # than 1 year before the course is supposed to take place,
@@ -179,7 +180,7 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
 
                 for date in dates:
                     try:
-                        cur_date = pd.to_datetime(date)
+                        cur_date = pd.to_datetime(date, format ='%d/%m/%Y')
                         #date_match = (pd.to_datetime(date) == pd.to_datetime(key))
                         #date_match = np.logical_and(cur_date >= begin_date,
                         #                            cur_date <= end_date)
@@ -216,15 +217,15 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
 
         if i==3:
             # found if we found athlé running, or course pied compétition
-            found[i] = np.logical_or(
-                                np.sum(found_temp[:2]) == len(found_temp[:2]),
-                                np.sum(found_temp[2:]) == len(found_temp[2:]))
+            found[i] = np.logical_or.reduce((
+                        np.sum(found_temp[:2]) == len(found_temp[:2]),
+                        np.sum(found_temp[2:5]) == len(found_temp[2:5]),
+                        np.sum(found_temp[4:]) == len(found_temp[4:])))
         else:
             # for date, if we have one or more matches, that is valid
             found[i] = (np.sum(found_temp) >= len(keywords))
-        print(found_temp, found)
-        df.at[current_id, cols[i]] = bool(found[i])
 
+        df.at[current_id, cols[i]] = bool(found[i])
     return df
 
 
@@ -245,7 +246,7 @@ def replace_month(date):
     """
 
     month_name = {'janv': 1, 'fevr': 2, 'mars': 3, 'avri': 4, 'mai': 5,
-                  'juin': 6, 'juil': 7, 'août': 8,'aout':8, 'sept': 9, 'octo': 10,
+                  'juin': 6, 'juil': 7, 'août': 8, 'aout':8, 'sept': 9, 'octo': 10,
                   'nove': 11,'dece': 12
                 }
     try:
@@ -254,7 +255,7 @@ def replace_month(date):
 
         # take the first 4 letters
         month = month[:4]
-        std_date = str(day)+"/"+ str(month_name[month])+"/"+str(year)
+        std_date = str(day)+ "/" + str(month_name[month])+ "/" +str(year)
     except ValueError:
         std_date = ""
 

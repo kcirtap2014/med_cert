@@ -34,7 +34,7 @@ if __name__ == '__main__':
     # define file_list
     ext = tuple(['pdf', 'jpg', 'jpeg', 'png'])
     file_list = [f for f in os.listdir(cert_dir) if f.endswith(ext)]
-    
+    #file_list = ["Denizeaux_Paul_030918.pdf"]
     # sort by alphabetical order
     sorted_file_list = sorted(file_list)
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         txt_img = pytesseract.image_to_string(im,  lang='fra')
         txt = text_preprocess(txt_img)
 
-        if True:
+        if False:
             # thresholding tests (@Jerôme, tu peux faire tes tests de thresholding
             # ou filtrages ici)
             thresh = threshold_otsu(mat_img)
@@ -87,6 +87,6 @@ if __name__ == '__main__':
             print("*"*30)
             print('\nResulting text:')
             print(txt)
-        df_exp = keyword_lookup(i, df_exp, filename, txt, '2/17/2018')
-    print(df_exp)
+        df_exp = keyword_lookup(i, df_exp, filename, txt, '17/2/2018')
+
     df_exp.to_csv(dir_path + "/df.csv", index=False)
