@@ -34,8 +34,7 @@ if __name__ == '__main__':
     # define file_list
     ext = tuple(['pdf', 'jpg', 'jpeg', 'png'])
     file_list = [f for f in os.listdir(cert_dir) if f.endswith(ext)]
-    file_list = ['Cambon_Nathalie_080918.pdf', 'Chervet_Fabienne_310819.jpg', 'Duros_Guillaume_050918.pdf', 'Gardant_Frederique_250118.pdf', 'Kerherve_Loic_250518.pdf', 'Martian_Martine_280818.pdf', 'Miguel_Olivier_310819.jpg', 'Pereon_Yves-Marie_260718.pdf', 'Potricas_Joao_310819.jpg', 'Rousseau_Beatrice_050918.pdf', 'Rousseau_Patrick_050918.pdf']
-    #['Rousseau_Beatrice_050918.pdf']
+    
     # sort by alphabetical order
     sorted_file_list = sorted(file_list)
 

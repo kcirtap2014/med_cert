@@ -44,7 +44,7 @@ def find_whole_word(w):
 
     return re.compile(r'\b({0})\b'.format(w), flags=re.IGNORECASE).search
 
-def find_partial(w, txt, found, n_keep_char):
+def find_partial(w, txt, n_keep_char):
     """
     apply editdistance to groud truth words and extracted text. This also
     works when there are tuples such as composed name ("Jean","Noel"). For now,
@@ -69,6 +69,7 @@ def find_partial(w, txt, found, n_keep_char):
     --------
     found: boolean
     """
+    found = False
 
     if isinstance(w, tuple):
         # for composed words, search only for the fist word in the bigram tuple
@@ -133,7 +134,8 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
     """
 
     extracted = extract_name(filename)
-    keywords = extracted[:-1] + [("course", "pied", "compétition")]
+    # (athle running) for license FFA
+    keywords = extracted[:-1] + [("athle", "running", "course", "pied", "compétition")]
     keywords_preprocessed = []
 
     # prprocess keywords, special processing for tuples, make everything
@@ -169,14 +171,19 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
                 #check for dates, condition of date match has to be modified for
                 # production
                 begin_date = pd.to_datetime(begin_date)
-                end_date = pd.to_datetime(begin_date) + pd.Timedelta(weeks=52)
+
+                # we don't need to specify end date, if the begin time is more
+                # than 1 year before the course is supposed to take place,
+                # that should be fine
+                #end_date = pd.to_datetime(begin_date) + pd.Timedelta(weeks=52)
 
                 for date in dates:
                     try:
                         cur_date = pd.to_datetime(date)
                         #date_match = (pd.to_datetime(date) == pd.to_datetime(key))
-                        date_match = np.logical_and(cur_date >= begin_date,
-                                                    cur_date <= end_date)
+                        #date_match = np.logical_and(cur_date >= begin_date,
+                        #                            cur_date <= end_date)
+                        date_match = (cur_date >= begin_date)
                     except ValueError:
                         date_match = False
 
@@ -203,12 +210,18 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
                     else:
                         key_partial = key
 
-                    found_it = find_partial(key_partial, txt,
-                            found_it, n_keep_char)
+                    found_it = find_partial(key_partial, txt, n_keep_char)
 
                 found_temp.append(found_it)
 
-        found[i] = (np.sum(found_temp) == len(keywords))
+        if i==3:
+            # found if we found athlé running, or course pied compétition
+            found[i] = np.logical_or(
+                                np.sum(found_temp[:2]) == len(found_temp[:2]),
+                                np.sum(found_temp[2:]) == len(found_temp[2:]))
+        else:
+            # for date, if we have one or more matches, that is valid
+            found[i] = (np.sum(found_temp) >= len(keywords))
         print(found_temp, found)
         df.at[current_id, cols[i]] = bool(found[i])
 
