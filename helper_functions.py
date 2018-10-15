@@ -6,6 +6,7 @@ from PIL import Image, ImageChops
 import re
 from skimage.filters import threshold_local
 import editdistance
+import pdb
 
 def extract_name(filename):
     """
@@ -100,15 +101,14 @@ def find_partial(w, txt, found, n_keep_char):
 
         for key, value in matched_list:
             word = dict_wordlist[key]
-            #print(word, w)
 
             if editdistance.eval(word, w) <= 2:
-                #print("Found", word, w)
                 found = True
 
     return found
 
-def keyword_lookup(current_id, df, filename, txt, n_keep_char=3):
+def keyword_lookup(current_id, df, filename, txt, begin_date,
+                   n_keep_char=3, ):
     """
     look up the keywords from extracted words of the document
 
@@ -148,9 +148,15 @@ def keyword_lookup(current_id, df, filename, txt, n_keep_char=3):
         if i == 2:
             #check for dates, condition of date match has to be modified for
             # production
+            begin_date = pd.to_datetime(begin_date)
+            end_date = pd.to_datetime(begin_date) + pd.Timedelta(weeks=52)
+            
             for date in dates:
                 try:
-                    date_match = (pd.to_datetime(date) == pd.to_datetime(key))
+                    cur_date = pd.to_datetime(date)
+                    #date_match = (pd.to_datetime(date) == pd.to_datetime(key))
+                    date_match = np.logical_and(cur_date >= begin_date,
+                                                cur_date <= end_date)
                 except ValueError:
                     date_match = False
 
@@ -201,7 +207,7 @@ def replace_month(date):
     """
 
     month_name = {'janv': 1, 'févr': 2, 'mars': 3, 'avri': 4, 'mai': 5,
-                  'juin': 6, 'juil': 7, 'août': 8, 'sept': 9, 'octo': 10,
+                  'juin': 6, 'juil': 7, 'août': 8,'aout':8, 'sept': 9, 'octo': 10,
                   'nove': 11,'déce': 12
                 }
     try:
@@ -282,7 +288,7 @@ def parse_date(txt):
 
     date_arr2_temp = re.compile(
         r"\d{1,2}[a-z]*[\.\-\s\/]?" \
-        + r"(?:jan|fév|mar|avr|mai|juin|juil|août|sept|oct|nov|déc)" \
+        + r"(?:jan|fév|mar|avr|mai|juin|juil|août|aout|sept|oct|nov|déc)" \
         + r"(?:\.|[a-z])*[\,\s\-\/]{0,2}\d{2,4}",
         flags=re.IGNORECASE).findall(txt)
 
