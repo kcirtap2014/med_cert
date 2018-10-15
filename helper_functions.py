@@ -7,6 +7,7 @@ import re
 from skimage.filters import threshold_local
 import editdistance
 import pdb
+from unidecode import unidecode
 
 def extract_name(filename):
     """
@@ -132,8 +133,23 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
     """
 
     extracted = extract_name(filename)
-    keywords = extracted[:-1] + ["compétition"]
-    keywords_preprocessed = [text_preprocess(k) for k in keywords]
+    keywords = extracted[:-1] + [("course", "pied", "compétition")]
+    keywords_preprocessed = []
+
+    # prprocess keywords, special processing for tuples, make everything
+    # a tuple for easier processing later
+    for word in keywords:
+        tuple_keywords = []
+
+        if isinstance(word, tuple):
+            for t in word:
+                tuple_keywords.append(text_preprocess(t))
+
+        else:
+            tuple_keywords.append(text_preprocess(word))
+
+        keywords_preprocessed.append(tuple(tuple_keywords))
+
     temp_df = pd.DataFrame(
         [extracted + [filename, False, False, False, False]],
         columns=df.columns,
@@ -143,49 +159,58 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
 
     # retain only columns for tick boxes
     cols = df.columns[5:]
+    found = np.zeros(4) # 4 columns to check
 
-    for i, key in enumerate(keywords_preprocessed):
-        if i == 2:
-            #check for dates, condition of date match has to be modified for
-            # production
-            begin_date = pd.to_datetime(begin_date)
-            end_date = pd.to_datetime(begin_date) + pd.Timedelta(weeks=52)
-            
-            for date in dates:
-                try:
-                    cur_date = pd.to_datetime(date)
-                    #date_match = (pd.to_datetime(date) == pd.to_datetime(key))
-                    date_match = np.logical_and(cur_date >= begin_date,
-                                                cur_date <= end_date)
-                except ValueError:
-                    date_match = False
+    for i, keywords in enumerate(keywords_preprocessed):
+        found_temp = []
 
-                if date_match:
-                    df.at[current_id, cols[i]] = date_match
+        for key in keywords:
+            if i == 2:
+                #check for dates, condition of date match has to be modified for
+                # production
+                begin_date = pd.to_datetime(begin_date)
+                end_date = pd.to_datetime(begin_date) + pd.Timedelta(weeks=52)
 
-        else:
-            # if we have the exactly the same word, consider True,
-            # otherwise proceed with Levenshtein distance evaluation
-            found = bool(find_whole_word(key)(txt))
+                for date in dates:
+                    try:
+                        cur_date = pd.to_datetime(date)
+                        #date_match = (pd.to_datetime(date) == pd.to_datetime(key))
+                        date_match = np.logical_and(cur_date >= begin_date,
+                                                    cur_date <= end_date)
+                    except ValueError:
+                        date_match = False
 
-            if not found:
-                composed_key = None
-                # consider words that start with the same 3 letters
-                if (bool(
-                        re.compile(
-                            r'[a-z]*\-[a-z]*'.format(key),
-                            flags=re.IGNORECASE).search(key))):
-                    key_temp = key.replace("-", " ")
-                    composed_key = create_ngram(key_temp)[0]
+                    found_temp.append(date_match)
 
-                if composed_key is not None:
-                    key_partial = composed_key
-                else:
-                    key_partial = key
+            else:
+                # if we have the exactly the same word, consider True,
+                # otherwise proceed with Levenshtein distance evaluation
 
-                found = find_partial(key_partial, txt, found, n_keep_char)
+                found_it = bool(find_whole_word(key)(txt))
 
-            df.at[current_id, cols[i]] = found
+                if not found_it:
+                    composed_key = None
+                    # consider words that start with the same 3 letters
+                    if (bool(
+                            re.compile(
+                                r'[a-z]*\-[a-z]*'.format(key),
+                                flags=re.IGNORECASE).search(key))):
+                        key_temp = key.replace("-", " ")
+                        composed_key = create_ngram(key_temp)[0]
+
+                    if composed_key is not None:
+                        key_partial = composed_key
+                    else:
+                        key_partial = key
+
+                    found_it = find_partial(key_partial, txt,
+                            found_it, n_keep_char)
+
+                found_temp.append(found_it)
+
+        found[i] = (np.sum(found_temp) == len(keywords))
+        print(found_temp, found)
+        df.at[current_id, cols[i]] = bool(found[i])
 
     return df
 
@@ -206,9 +231,9 @@ def replace_month(date):
         date writen in this form: day/month/date
     """
 
-    month_name = {'janv': 1, 'févr': 2, 'mars': 3, 'avri': 4, 'mai': 5,
+    month_name = {'janv': 1, 'fevr': 2, 'mars': 3, 'avri': 4, 'mai': 5,
                   'juin': 6, 'juil': 7, 'août': 8,'aout':8, 'sept': 9, 'octo': 10,
-                  'nove': 11,'déce': 12
+                  'nove': 11,'dece': 12
                 }
     try:
         date = re.sub(r"(\d)([a-z])", r"\1 \2", date)
@@ -288,7 +313,7 @@ def parse_date(txt):
 
     date_arr2_temp = re.compile(
         r"\d{1,2}[a-z]*[\.\-\s\/]?" \
-        + r"(?:jan|fév|mar|avr|mai|juin|juil|août|aout|sept|oct|nov|déc)" \
+        + r"(?:jan|fev|mar|avr|mai|juin|juil|aout|sept|oct|nov|dec)" \
         + r"(?:\.|[a-z])*[\,\s\-\/]{0,2}\d{2,4}",
         flags=re.IGNORECASE).findall(txt)
 
@@ -319,8 +344,10 @@ def text_preprocess(txt):
     txt_skipline = re.compile(r'\n').sub(' ', txt_punct)
     # replace em-dash
     txt_dashline = re.compile(r'\u2014').sub('-', txt_skipline)
+    # remove accent
+    txt_accent_free = unidecode(txt_dashline)
 
-    return txt_dashline
+    return txt_accent_free
 
 def trim(im):
     """
@@ -415,7 +442,10 @@ def wordSegmentation(img, kernelSize=25, sigma=11, theta=7, minArea=0):
 
 
 def prepareImg(img, height):
-    """convert given image to grayscale image (if needed) and resize to desired height"""
+    """
+    convert given image to grayscale image (if needed)
+    and resize to desired height
+    """
     assert img.ndim in (2, 3)
     if img.ndim == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
