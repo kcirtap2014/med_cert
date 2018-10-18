@@ -8,6 +8,7 @@ from pdf2image import convert_from_path
 from skimage.filters import threshold_otsu, threshold_mean
 import warnings
 from helper_functions import rotation, text_preprocess, trim, keyword_lookup
+import pickle
 
 warnings.filterwarnings("ignore", category=UserWarning)
 sns.set_style("ticks")
@@ -33,9 +34,11 @@ if __name__ == '__main__':
     # define file_list
     ext = tuple(['pdf', 'jpg', 'jpeg', 'png'])
     file_list = [f for f in os.listdir(cert_dir) if f.endswith(ext)]
-    np.random.shuffle(file_list)
+    #file_list = ["Denizeaux_Paul_030918.pdf"]
+    # sort by alphabetical order
+    sorted_file_list = sorted(file_list)
 
-    for i, file in enumerate(file_list):
+    for i, file in enumerate(sorted_file_list):
         filename = os.fsdecode(file)
         src = os.path.join(str(cert_dir), filename)
         print("%d:%s"%(i,filename))
@@ -84,6 +87,6 @@ if __name__ == '__main__':
             print("*"*30)
             print('\nResulting text:')
             print(txt)
-        df_exp = keyword_lookup(i, df_exp, filename, txt)
+        df_exp = keyword_lookup(i, df_exp, filename, txt, '17/2/2018')
 
-    df_exp.to_csv(dir_path + "/df_exp.csv", index=False)
+    df_exp.to_csv(dir_path + "/df.csv", index=False)

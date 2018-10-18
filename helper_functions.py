@@ -6,6 +6,8 @@ from PIL import Image, ImageChops
 import re
 from skimage.filters import threshold_local
 import editdistance
+import pdb
+from unidecode import unidecode
 
 def extract_name(filename):
     """
@@ -42,7 +44,7 @@ def find_whole_word(w):
 
     return re.compile(r'\b({0})\b'.format(w), flags=re.IGNORECASE).search
 
-def find_partial(w, txt, found, n_keep_char):
+def find_partial(w, txt, n_keep_char):
     """
     apply editdistance to groud truth words and extracted text. This also
     works when there are tuples such as composed name ("Jean","Noel"). For now,
@@ -67,6 +69,7 @@ def find_partial(w, txt, found, n_keep_char):
     --------
     found: boolean
     """
+    found = False
 
     if isinstance(w, tuple):
         # for composed words, search only for the fist word in the bigram tuple
@@ -100,15 +103,14 @@ def find_partial(w, txt, found, n_keep_char):
 
         for key, value in matched_list:
             word = dict_wordlist[key]
-            #print(word, w)
 
             if editdistance.eval(word, w) <= 2:
-                #print("Found", word, w)
                 found = True
 
     return found
 
-def keyword_lookup(current_id, df, filename, txt, n_keep_char=3):
+def keyword_lookup(current_id, df, filename, txt, begin_date,
+                   n_keep_char=3, ):
     """
     look up the keywords from extracted words of the document
 
@@ -132,8 +134,25 @@ def keyword_lookup(current_id, df, filename, txt, n_keep_char=3):
     """
 
     extracted = extract_name(filename)
-    keywords = extracted[:-1] + ["compétition"]
-    keywords_preprocessed = [text_preprocess(k) for k in keywords]
+    # (athle running) for license FFA
+    keywords = extracted[:-1] + [("athle", "running", "course",
+                                  "pied", "compétition", "athlétisme")]
+    keywords_preprocessed = []
+
+    # prprocess keywords, special processing for tuples, make everything
+    # a tuple for easier processing later
+    for word in keywords:
+        tuple_keywords = []
+
+        if isinstance(word, tuple):
+            for t in word:
+                tuple_keywords.append(text_preprocess(t))
+
+        else:
+            tuple_keywords.append(text_preprocess(word))
+
+        keywords_preprocessed.append(tuple(tuple_keywords))
+
     temp_df = pd.DataFrame(
         [extracted + [filename, False, False, False, False]],
         columns=df.columns,
@@ -143,44 +162,70 @@ def keyword_lookup(current_id, df, filename, txt, n_keep_char=3):
 
     # retain only columns for tick boxes
     cols = df.columns[5:]
+    found = np.zeros(4) # 4 columns to check
 
-    for i, key in enumerate(keywords_preprocessed):
-        if i == 2:
-            #check for dates, condition of date match has to be modified for
-            # production
-            for date in dates:
-                try:
-                    date_match = (pd.to_datetime(date) == pd.to_datetime(key))
-                except ValueError:
-                    date_match = False
+    for i, keywords in enumerate(keywords_preprocessed):
+        found_temp = []
 
-                if date_match:
-                    df.at[current_id, cols[i]] = date_match
+        for key in keywords:
+            if i == 2:
+                #check for dates, condition of date match has to be modified for
+                # production
+                begin_date = pd.to_datetime(begin_date, format ='%d/%m/%Y')
 
+                # we don't need to specify end date, if the begin time is more
+                # than 1 year before the course is supposed to take place,
+                # that should be fine
+                #end_date = pd.to_datetime(begin_date) + pd.Timedelta(weeks=52)
+
+                for date in dates:
+                    try:
+                        cur_date = pd.to_datetime(date, format ='%d/%m/%Y')
+                        #date_match = (pd.to_datetime(date) == pd.to_datetime(key))
+                        #date_match = np.logical_and(cur_date >= begin_date,
+                        #                            cur_date <= end_date)
+                        date_match = (cur_date >= begin_date)
+                    except ValueError:
+                        date_match = False
+
+                    found_temp.append(date_match)
+
+            else:
+                # if we have the exactly the same word, consider True,
+                # otherwise proceed with Levenshtein distance evaluation
+
+                found_it = bool(find_whole_word(key)(txt))
+
+                if not found_it:
+                    composed_key = None
+                    # consider words that start with the same 3 letters
+                    if (bool(
+                            re.compile(
+                                r'[a-z]*\-[a-z]*'.format(key),
+                                flags=re.IGNORECASE).search(key))):
+                        key_temp = key.replace("-", " ")
+                        composed_key = create_ngram(key_temp)[0]
+
+                    if composed_key is not None:
+                        key_partial = composed_key
+                    else:
+                        key_partial = key
+
+                    found_it = find_partial(key_partial, txt, n_keep_char)
+
+                found_temp.append(found_it)
+
+        if i==3:
+            # found if we found athlé running, or course pied compétition
+            found[i] = np.logical_or.reduce((
+                        np.sum(found_temp[:2]) == len(found_temp[:2]),
+                        np.sum(found_temp[2:5]) == len(found_temp[2:5]),
+                        np.sum(found_temp[4:]) == len(found_temp[4:])))
         else:
-            # if we have the exactly the same word, consider True,
-            # otherwise proceed with Levenshtein distance evaluation
-            found = bool(find_whole_word(key)(txt))
+            # for date, if we have one or more matches, that is valid
+            found[i] = (np.sum(found_temp) >= len(keywords))
 
-            if not found:
-                composed_key = None
-                # consider words that start with the same 3 letters
-                if (bool(
-                        re.compile(
-                            r'[a-z]*\-[a-z]*'.format(key),
-                            flags=re.IGNORECASE).search(key))):
-                    key_temp = key.replace("-", " ")
-                    composed_key = create_ngram(key_temp)[0]
-
-                if composed_key is not None:
-                    key_partial = composed_key
-                else:
-                    key_partial = key
-
-                found = find_partial(key_partial, txt, found, n_keep_char)
-
-            df.at[current_id, cols[i]] = found
-
+        df.at[current_id, cols[i]] = bool(found[i])
     return df
 
 
@@ -200,9 +245,9 @@ def replace_month(date):
         date writen in this form: day/month/date
     """
 
-    month_name = {'janv': 1, 'févr': 2, 'mars': 3, 'avri': 4, 'mai': 5,
-                  'juin': 6, 'juil': 7, 'août': 8, 'sept': 9, 'octo': 10,
-                  'nove': 11,'déce': 12
+    month_name = {'janv': 1, 'fevr': 2, 'mars': 3, 'avri': 4, 'mai': 5,
+                  'juin': 6, 'juil': 7, 'août': 8, 'aout':8, 'sept': 9, 'octo': 10,
+                  'nove': 11,'dece': 12
                 }
     try:
         date = re.sub(r"(\d)([a-z])", r"\1 \2", date)
@@ -210,7 +255,7 @@ def replace_month(date):
 
         # take the first 4 letters
         month = month[:4]
-        std_date = str(day)+"/"+ str(month_name[month])+"/"+str(year)
+        std_date = str(day)+ "/" + str(month_name[month])+ "/" +str(year)
     except ValueError:
         std_date = ""
 
@@ -282,7 +327,7 @@ def parse_date(txt):
 
     date_arr2_temp = re.compile(
         r"\d{1,2}[a-z]*[\.\-\s\/]?" \
-        + r"(?:jan|fév|mar|avr|mai|juin|juil|août|sept|oct|nov|déc)" \
+        + r"(?:jan|fev|mar|avr|mai|juin|juil|aout|sept|oct|nov|dec)" \
         + r"(?:\.|[a-z])*[\,\s\-\/]{0,2}\d{2,4}",
         flags=re.IGNORECASE).findall(txt)
 
@@ -313,8 +358,10 @@ def text_preprocess(txt):
     txt_skipline = re.compile(r'\n').sub(' ', txt_punct)
     # replace em-dash
     txt_dashline = re.compile(r'\u2014').sub('-', txt_skipline)
+    # remove accent
+    txt_accent_free = unidecode(txt_dashline)
 
-    return txt_dashline
+    return txt_accent_free
 
 def trim(im):
     """
@@ -409,7 +456,10 @@ def wordSegmentation(img, kernelSize=25, sigma=11, theta=7, minArea=0):
 
 
 def prepareImg(img, height):
-    """convert given image to grayscale image (if needed) and resize to desired height"""
+    """
+    convert given image to grayscale image (if needed)
+    and resize to desired height
+    """
     assert img.ndim in (2, 3)
     if img.ndim == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

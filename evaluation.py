@@ -14,13 +14,13 @@ args = parser.parse_args()
 
 if __name__ == '__main__':
     dir_path = os.getcwd()
-    fig_path = dir_path + "/fig"
+    fig_path = dir_path + "/fig_new"
 
     # check if fig_path exists
     if not os.path.exists(fig_path):
         os.makedirs(fig_path)
 
-    df = pd.read_csv(dir_path +"/df_res.csv")
+    df = pd.read_csv(dir_path +"/df.csv")
 
     keep_columns = ["C_Nom","C_Prenom","C_Date","C_Mention"]
     df["Score"] = df[keep_columns].sum(axis=1).values
@@ -41,6 +41,8 @@ if __name__ == '__main__':
         with open(dir_path +'/retained_file_score_%d' %i, 'wb') as fp:
             pickle.dump(file_list_crnn, fp)
 
+        print("Score %d:" %i)
+        print(file_list_crnn)
     # To read the pickle file
     # with open(dir_path +'/retained_file_score_3', 'rb') as fp:
     #    list = pickle.load(fp)
