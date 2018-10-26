@@ -226,7 +226,7 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
             found[i] = (np.sum(found_temp) >= len(keywords))
 
         df.at[current_id, cols[i]] = bool(found[i])
-    return df
+    return df[-1:]
 
 
 def replace_month(date):
