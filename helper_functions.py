@@ -171,7 +171,7 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
             if i == 2:
                 #check for dates, condition of date match has to be modified for
                 # production
-                begin_date = pd.to_datetime(begin_date, format ='%d/%m/%Y')
+                begin_date = pd.to_datetime(begin_date, dayfirst=True)
 
                 # we don't need to specify end date, if the begin time is more
                 # than 1 year before the course is supposed to take place,
@@ -180,7 +180,7 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
 
                 for date in dates:
                     try:
-                        cur_date = pd.to_datetime(date, format ='%d/%m/%Y')
+                        cur_date = pd.to_datetime(date, dayfirst=True)
                         #date_match = (pd.to_datetime(date) == pd.to_datetime(key))
                         #date_match = np.logical_and(cur_date >= begin_date,
                         #                            cur_date <= end_date)
@@ -335,6 +335,7 @@ def parse_date(txt):
     # concatenate both lists
     date_arr = date_arr1 + date_arr2
     # print(date_arr)
+
     return date_arr
 
 
