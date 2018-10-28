@@ -110,7 +110,7 @@ def find_partial(w, txt, n_keep_char):
     return found
 
 def keyword_lookup(current_id, df, filename, txt, begin_date,
-                   n_keep_char=3, ):
+                   n_keep_char=3, l_prod=False ):
     """
     look up the keywords from extracted words of the document
 
@@ -135,8 +135,13 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
 
     extracted = extract_name(filename)
     # (athle running) for license FFA
-    keywords = extracted[:-1] + [("athle", "running", "course",
+    if l_prod:
+        keywords = extracted[1:4] + [("athle", "running", "course",
+                                    "pied", "compétition", "athlétisme")]
+    else:
+        keywords = extracted[:-1] + [("athle", "running", "course",
                                   "pied", "compétition", "athlétisme")]
+
     keywords_preprocessed = []
 
     # prprocess keywords, special processing for tuples, make everything
@@ -153,15 +158,27 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
 
         keywords_preprocessed.append(tuple(tuple_keywords))
 
-    temp_df = pd.DataFrame(
-        [extracted + [filename, False, False, False, False]],
-        columns=df.columns,
-        index=[current_id])
+    # FRP
+    if l_prod:
+        temp_df = pd.DataFrame(
+            [extracted + [filename, False, False, False, False]],
+            columns=df.columns,
+            index=[current_id])
+    else:
+        temp_df = pd.DataFrame(
+            [extracted + [filename, False, False, False, False]],
+            columns=df.columns,
+            index=[current_id])
+
     df = df.append(temp_df)
     dates = parse_date(txt)
 
     # retain only columns for tick boxes
-    cols = df.columns[5:]
+    if l_prod:
+        cols = df.columns[6:]
+    else:
+        cols = df.columns[5:]
+    #cols = df.columns[7:]
     found = np.zeros(4) # 4 columns to check
 
     for i, keywords in enumerate(keywords_preprocessed):
@@ -171,7 +188,7 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
             if i == 2:
                 #check for dates, condition of date match has to be modified for
                 # production
-                begin_date = pd.to_datetime(begin_date, format ='%d/%m/%Y')
+                begin_date = pd.to_datetime(begin_date, dayfirst=True)
 
                 # we don't need to specify end date, if the begin time is more
                 # than 1 year before the course is supposed to take place,
@@ -180,11 +197,12 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
 
                 for date in dates:
                     try:
-                        cur_date = pd.to_datetime(date, format ='%d/%m/%Y')
+                        cur_date = pd.to_datetime(date, dayfirst=True)
                         #date_match = (pd.to_datetime(date) == pd.to_datetime(key))
                         #date_match = np.logical_and(cur_date >= begin_date,
                         #                            cur_date <= end_date)
                         date_match = (cur_date >= begin_date)
+
                     except ValueError:
                         date_match = False
 
@@ -314,8 +332,8 @@ def parse_date(txt):
 
      # sometimes 1 can be detected as l, or spaces, we take that into account
     date_arr1 = re.compile(
-        r"(?:l\d{1,2}|\d{1,2}l|ll|\d{1,2})[\/\-\s]{1,2}" \
-        + r"(?:l\d{1,2}|\d{1,2}l|ll|\d{1,2})[\/\-\s]{1,2}" \
+        r"(?:l\d{1,2}|\d{1,2}l|ll|\d{1,2})[\/\-]{1,2}" \
+        + r"(?:l\d{1,2}|\d{1,2}l|ll|\d{1,2})[\/\-]{1,2}" \
         + r"(?:l\d{1}|\d{1}l|ll|\d{2}l\d{1}|\d{2,4})"
     ).findall(txt)
 
@@ -334,7 +352,7 @@ def parse_date(txt):
     date_arr2 = [replace_month(date) for date in date_arr2_temp]
     # concatenate both lists
     date_arr = date_arr1 + date_arr2
-    # print(date_arr)
+
     return date_arr
 
 

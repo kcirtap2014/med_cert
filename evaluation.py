@@ -19,7 +19,7 @@ if __name__ == '__main__':
     # check if fig_path exists
     if not os.path.exists(fig_path):
         os.makedirs(fig_path)
-
+    
     df = pd.read_csv(dir_path +"/df.csv")
 
     keep_columns = ["C_Nom","C_Prenom","C_Date","C_Mention"]

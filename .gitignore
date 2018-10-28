@@ -5,4 +5,5 @@ pdf/*
 TestCertificats/*
 retained*
 README
-fig/*
+main_production.py
+fig*/*

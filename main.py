@@ -18,23 +18,31 @@ if __name__ == '__main__':
     # some flags
     dir_path = os.getcwd()
     dir_pdf_path = dir_path +"/pdf/"
+    l_FRP = True
 
     # thresholding for segmenting objects form a background
     threshold = 200
 
-    # load certificates
-    cert_dir = dir_path + '/TestCertificats/'
+    # load certificates, prepare an empty DataFrame
+    if l_FRP:
+        cert_dir = dir_path + '/TestCertificats/'
 
-    # prepare an empty DataFrame
-    df_exp = pd.DataFrame(columns=[
-        "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom",
-        "C_Prenom", "C_Date", "C_Mention"
-    ])
+        df_exp = pd.DataFrame(columns=[
+            "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom",
+            "C_Prenom", "C_Date", "C_Mention"
+        ])
+    else:
+        cert_dir = dir_path + '/11658-certificats/'
+
+        df_exp = pd.DataFrame(columns=[
+            "R_Date", "Nom", "Prenom", "BirthYear", "BibNo", "Ext",
+            "FileName", "C_Nom","C_Prenom", "C_Date", "C_Mention"
+        ])
 
     # define file_list
     ext = tuple(['pdf', 'jpg', 'jpeg', 'png'])
     file_list = [f for f in os.listdir(cert_dir) if f.endswith(ext)]
-    #file_list = ["Denizeaux_Paul_030918.pdf"]
+
     # sort by alphabetical order
     sorted_file_list = sorted(file_list)
 
@@ -88,5 +96,5 @@ if __name__ == '__main__':
             print('\nResulting text:')
             print(txt)
         df_exp = keyword_lookup(i, df_exp, filename, txt, '17/2/2018')
-
+    print(df_exp)
     df_exp.to_csv(dir_path + "/df.csv", index=False)
