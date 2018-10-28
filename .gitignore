@@ -10,3 +10,4 @@ main_production.py
 temp_file/*
 fig*/*
 retained*
+result_fig/*
