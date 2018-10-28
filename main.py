@@ -18,25 +18,17 @@ if __name__ == '__main__':
     # some flags
     dir_path = os.getcwd()
     dir_pdf_path = dir_path +"/pdf/"
-    l_FRP = True
 
     # thresholding for segmenting objects form a background
     threshold = 200
 
     # load certificates, prepare an empty DataFrame
-    if l_FRP:
-        cert_dir = dir_path + '/TestCertificats/'
 
-        df_exp = pd.DataFrame(columns=[
+    cert_dir = dir_path + '/TestCertificats/'
+
+    df_exp = pd.DataFrame(columns=[
             "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom",
             "C_Prenom", "C_Date", "C_Mention"
-        ])
-    else:
-        cert_dir = dir_path + '/11658-certificats/'
-
-        df_exp = pd.DataFrame(columns=[
-            "R_Date", "Nom", "Prenom", "BirthYear", "BibNo", "Ext",
-            "FileName", "C_Nom","C_Prenom", "C_Date", "C_Mention"
         ])
 
     # define file_list
