@@ -42,9 +42,6 @@ if __name__ == '__main__':
 
     # sort by alphabetical order
     sorted_file_list = sorted(file_list)
-    sorted_file_list = ['Galland_Regis_220818.pdf', 'Carteaux_Gregory_190618.jpeg',
-                        'Lacroix_Rene_070918.pdf', 'Lefranc_Samuel_060918.pdf',
-                        'Lemercier_Elena_060918.pdf']
 
     for i, file in enumerate(sorted_file_list):
         filename = os.fsdecode(file)
