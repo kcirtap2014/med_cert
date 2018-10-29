@@ -31,16 +31,6 @@ if __name__ == '__main__':
     # load certificates
     cert_dir = dir_path + '/TestCertificats/'
 
-    # prepare an empty DataFrame
-    #df_exp = pd.DataFrame(columns=[
-    #    "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom",
-    #    "C_Prenom", "C_Date", "C_Mention"])
-
-    # define file_list
-    #ext = tuple(['pdf', 'jpg', 'jpeg', 'png'])
-    #file_list = [f for f in os.listdir(cert_dir) if f.endswith(ext)]
-    #c_keywords = [("athle", "running", "course", "pied", "compétition",
-    #               "athlétisme", "semi-marathon", "marathon")]
     begin_date = '17/2/2018'
     #keywords_preprocessed = []
     # sort by alphabetical order
@@ -73,15 +63,15 @@ if __name__ == '__main__':
         txt_img = pytesseract.image_to_string(im)
         txt = text_preprocess(txt_img)
         temp = keyword_lookup(i, df_exp, filename, txt, begin_date, c_keywords)
-
+        #print(txt)
         # Keeping track of validated keywords in numeric format
         score_total = temp.iloc[:,5:9]*1
         #temp.iloc[:,5:9].sum(axis=1).values
         # If keywords are missing, applying transformations to try and find them
-
+        #pdb.set_trace()
         # Try 1 : Adaptative thresholding
         if (score_total.transpose().iloc[:,0].sum() != 4):
-            
+
             IMG0 = np.array(img)
             thresh = cv.adaptiveThreshold(IMG0,255,
                                         cv.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -95,6 +85,7 @@ if __name__ == '__main__':
 
             txt_img=pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
+            #print("1st", txt)
             temp = keyword_lookup(i, df_exp, filename, txt,
                                   begin_date, c_keywords)
             score=temp.iloc[:,5:9]*1
@@ -110,6 +101,7 @@ if __name__ == '__main__':
             im = trim(img_thresh)
             txt_img = pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
+            #print("2nd", txt)
             temp = keyword_lookup(i, df_exp, filename, txt,
                                   begin_date, c_keywords)
             score = temp.iloc[:,5:9]*1
@@ -127,6 +119,7 @@ if __name__ == '__main__':
             im = trim(img)
             txt_img = pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
+            #print("3rd", txt)
             temp = keyword_lookup(i, df_exp, filename, txt,
                                   begin_date, c_keywords)
             score = temp.iloc[:,5:9]*1
@@ -145,6 +138,7 @@ if __name__ == '__main__':
             im = trim(img_thresh)
             txt_img=pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
+            #print("4th", txt)
             temp = keyword_lookup(i, df_exp, filename, txt, begin_date, c_keywords)
             score=temp.iloc[:,5:9]*1
             #print("Reduced Thresholding : ")
@@ -158,6 +152,7 @@ if __name__ == '__main__':
             im = trim(img_thresh)
             txt_img = pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
+            #print("5th", txt)
             temp = keyword_lookup(i, df_exp, filename, txt,
                                   begin_date, c_keywords)
             score = temp.iloc[:,5:9]*1
@@ -174,7 +169,7 @@ if __name__ == '__main__':
 
         df_exp = df_exp.append(temp)
 
-    print(df_exp)
+    #print(df_exp)
 
     try:
         os.remove(dir_path+"/temp.pdf")

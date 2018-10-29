@@ -137,9 +137,110 @@ if __name__ == "__main__":
                 txt = ""
                 print("invalid PDF file")
 
-            df = keyword_lookup(j, df, filename, txt, '17/2/2018',
+            temp = keyword_lookup(j, df, filename, txt, '17/2/2018',
                                         l_prod=True)
             #os.remove(temp_path+filename)
+            # Keeping track of validated keywords in numeric format
+            score_total = temp.iloc[:,5:9]*1
+            #temp.iloc[:,5:9].sum(axis=1).values
+            # If keywords are missing, applying transformations to try and find them
+
+            # Try 1 : Adaptative thresholding
+            if (score_total.transpose().iloc[:,0].sum() != 4):
+
+                IMG0 = np.array(img)
+                thresh = cv.adaptiveThreshold(IMG0,255,
+                                            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                            cv.THRESH_BINARY,15,11)
+                img_thresh = Image.fromarray(thresh)
+                im = trim(img_thresh)
+
+                # pytesseract will sometimes crash if the image is too big (but only after thresholding for some reason)
+                if (np.array(img).shape[0]*np.array(img).shape[1] > 80000000):
+                    im.thumbnail((2000,2000),Image.ANTIALIAS)
+
+                txt_img=pytesseract.image_to_string(im)
+                txt = text_preprocess(txt_img)
+                temp = keyword_lookup(i, df_exp, filename, txt,
+                                      begin_date, c_keywords)
+                score=temp.iloc[:,5:9]*1
+                #print("Thresholding")
+                #Adding newly validated mentions to the tracker
+                score_total += score
+                score_total.replace(2, 1, inplace=True)
+
+            #Try 2 : Reducing image to a thumbnail
+            if (score_total.transpose().iloc[:,0].sum()!=4):
+
+                img_thresh.thumbnail((1000,1000))
+                im = trim(img_thresh)
+                txt_img = pytesseract.image_to_string(im)
+                txt = text_preprocess(txt_img)
+                temp = keyword_lookup(i, df_exp, filename, txt,
+                                      begin_date, c_keywords)
+                score = temp.iloc[:,5:9]*1
+                #print("Thumbnail")
+                score_total += score
+                score_total.replace(2, 1, inplace=True)
+
+            #Try 3 : reducing image quality by savind a thumbnail and reloading
+            if(score_total.transpose().iloc[:,0].sum() != 4):
+
+                img.thumbnail((1000,1000),Image.ANTIALIAS)
+                # Creating a temporary pdf save
+                img.save(temp_path+"/temp.pdf")
+
+                img = convert_from_path(dir_path+"/temp.pdf", fmt="png")[0].convert('L')
+                im = trim(img)
+                txt_img = pytesseract.image_to_string(im)
+                txt = text_preprocess(txt_img)
+                temp = keyword_lookup(i, df_exp, filename, txt,
+                                      begin_date, c_keywords)
+                score = temp.iloc[:,5:9]*1
+                #print("Reduce")
+                score_total += score
+                score_total.replace(2, 1, inplace=True)
+
+            # Try 4 : adaptative thresholding on the reduced quality image
+            if(score_total.transpose().iloc[:,0].sum()!=4):
+
+                IMG0=np.array(img)
+                thresh=cv.adaptiveThreshold(IMG0,255,
+                                            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                            cv.THRESH_BINARY,15,11)
+                img_thresh = Image.fromarray(thresh)
+                im = trim(img_thresh)
+                txt_img = pytesseract.image_to_string(im)
+                txt = text_preprocess(txt_img)
+                temp = keyword_lookup(i, df_exp, filename, txt, begin_date, c_keywords)
+                score = temp.iloc[:,5:9]*1
+                #print("Reduced Thresholding : ")
+                score_total += score
+                score_total.replace(2,1,inplace=True)
+
+            #Try 5 : Making a thumbnail of the reduced image
+            if(score_total.transpose().iloc[:,0].sum()!=4):
+
+                img_thresh.thumbnail((1000,1000))
+                im = trim(img_thresh)
+                txt_img = pytesseract.image_to_string(im)
+                txt = text_preprocess(txt_img)
+                temp = keyword_lookup(i, df_exp, filename, txt,
+                                      begin_date, c_keywords)
+                score = temp.iloc[:,5:9]*1
+                #print("Reduced thumbnail : ")
+                score_total += score
+                score_total.replace(2, 1, inplace=True)
+
+            # Removing temporary pdf file
+            for f in score_total.columns:
+                if(int(score_total[f][:1])==1):
+                    temp[f][:1]=True
+                else:
+                    temp[f][:1]=False
+
+            df = df.append(temp)
+
             keep_columns = ["C_Nom","C_Prenom","C_Date","C_Mention"]
             df["Score"] = df[keep_columns].sum(axis=1).values
 

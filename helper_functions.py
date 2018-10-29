@@ -86,7 +86,7 @@ def find_partial(w, txt, n_keep_char):
             wordlist = dict_wordlist[key]
 
             for i, word in enumerate(wordlist):
-                if editdistance.eval(word, w[i]) <= 2:
+                if editdistance.eval(word, w[i]) <= 3:
                     #print("Found", word, w[i])
                     found_list[i] = True
 
@@ -104,7 +104,7 @@ def find_partial(w, txt, n_keep_char):
         for key, value in matched_list:
             word = dict_wordlist[key]
 
-            if editdistance.eval(word, w) <= 2:
+            if editdistance.eval(word, w) <= 3:
                 found = True
 
     return found
@@ -225,6 +225,7 @@ def keyword_lookup(current_id, df, filename, txt, begin_date, c_keywords,
 
         if i==3:
             # found conditions
+
             found_temp = np.array(found_temp)
 
             found[i] = np.logical_or.reduce((
@@ -327,8 +328,8 @@ def parse_date(txt):
 
      # sometimes 1 can be detected as l, or spaces, we take that into account
     date_arr1 = re.compile(
-        r"(?:l\d{1,2}|\d{1,2}l|ll|\d{1,2})[\/\-\s]{1,2}" \
-        + r"(?:l\d{1,2}|\d{1,2}l|ll|\d{1,2})[\/\-\s]{1,2}" \
+        r"(?:l\d{1,2}|\d{1,2}l|ll|\d{1,2})[\/\-\s\,]{1,2}" \
+        + r"(?:l\d{1,2}|\d{1,2}l|ll|\d{1,2})[\/\-\s\,]{1,2}" \
         + r"(?:l\d{1}|\d{1}l|ll|\d{2}l\d{1}|\d{2,4})"
     ).findall(txt)
 
@@ -338,11 +339,18 @@ def parse_date(txt):
     # get rid of space
     date_arr1 = [date.replace(" ","") for date in date_arr1]
 
+    # replace comma by slash
+    date_arr1 = [date.replace(",","/") for date in date_arr1]
+
     date_arr2_temp = re.compile(
         r"\d{1,2}[a-z]*[\.\-\s\/]?" \
-        + r"(?:jan|fev|mar|avr|mai|juin|juil|aout|sept|oct|nov|dec)" \
+        + r"(?:jan|fev|mar|avr|mai|juin|juil|ao[a-z]{1,}|sept|oct|nov|dec)" \
         + r"(?:\.|[a-z])*[\,\s\-\/]{0,2}\d{2,4}",
         flags=re.IGNORECASE).findall(txt)
+
+    # convert erroneous aout writing to the correct one
+    date_arr2_temp = [re.sub(r"ao[a-z]{1,}", "aout", date)
+                      for date in date_arr2_temp]
 
     date_arr2 = [replace_month(date) for date in date_arr2_temp]
     # concatenate both lists
