@@ -1,10 +1,9 @@
-# Project: Medical certificates validation
+# Project: Text recognition
 copyright P. Lee, J. Deraze
 
-This project applies pytesseract to extract text from a medical certificate image, and identifying necessary keywords from the text, such as first name, surname, validity date and discipline with the word 'compétition'.
-
+This project applies pytesseract to extract text from documents, and identifying necessary keywords from the text.
 ## Approach:
-- Part 1: pytesseract (>50% certificates can be correctly identified)
+- Part 1: pytesseract 
 - Part 2: segmentation + CRNN
 
 ## Files:
