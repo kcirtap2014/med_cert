@@ -5,6 +5,8 @@ import pickle
 import argparse
 import pdb
 import matplotlib.pylab as plt
+from config import dir_path
+
 
 sns.set_style('ticks')
 parser = argparse.ArgumentParser()
@@ -13,7 +15,6 @@ parser.add_argument("--plot", help="Activate plot",type=bool, nargs='?',
 args = parser.parse_args()
 
 if __name__ == '__main__':
-    dir_path = os.getcwd()
     fig_path = dir_path + "/fig_new"
 
     # check if fig_path exists

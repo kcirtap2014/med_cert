@@ -109,8 +109,8 @@ def find_partial(w, txt, n_keep_char):
 
     return found
 
-def keyword_lookup(current_id, df, filename, txt, begin_date,
-                   n_keep_char=3, ):
+def keyword_lookup(current_id, df, filename, txt, begin_date, c_keywords,
+                   n_keep_char=2):
     """
     look up the keywords from extracted words of the document
 
@@ -127,6 +127,15 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
     txt: str
         extracted texts of the document
 
+    begin_date: str
+        begin date
+
+    c_keywords: list of tuples
+        tuples of keywords
+
+    n_keep_char: int
+        number of first letters to be kept
+
     Returns:
     --------
     df: pandas dataframe
@@ -135,8 +144,7 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
 
     extracted = extract_name(filename)
     # (athle running) for license FFA
-    keywords = extracted[:-1] + [("athle", "running", "course",
-                                  "pied", "compétition", "athlétisme")]
+    keywords = extracted[:-1] + c_keywords
     keywords_preprocessed = []
 
     # prprocess keywords, special processing for tuples, make everything
@@ -216,16 +224,21 @@ def keyword_lookup(current_id, df, filename, txt, begin_date,
                 found_temp.append(found_it)
 
         if i==3:
-            # found if we found athlé running, or course pied compétition
+            # found conditions
+            found_temp = np.array(found_temp)
+
             found[i] = np.logical_or.reduce((
                         np.sum(found_temp[:2]) == len(found_temp[:2]),
                         np.sum(found_temp[2:5]) == len(found_temp[2:5]),
-                        np.sum(found_temp[4:]) == len(found_temp[4:])))
+                        np.sum(found_temp[[4,6]]) == len(found_temp[[4,6]]),
+                        np.sum(found_temp[[4,7]]) == len(found_temp[[4,7]]),
+                        np.sum(found_temp[[4,5]]) == len(found_temp[[4,5]])))
         else:
             # for date, if we have one or more matches, that is valid
             found[i] = (np.sum(found_temp) >= len(keywords))
 
         df.at[current_id, cols[i]] = bool(found[i])
+    # return only the latest one
     return df[-1:]
 
 
