@@ -3,6 +3,7 @@ import numpy as np
 import seaborn as sns
 import pytesseract
 import os
+import argparse
 from PIL import Image
 from pdf2image import convert_from_path
 from skimage.filters import threshold_otsu, threshold_mean #No longer used?
@@ -22,8 +23,13 @@ from helper_functions import rotation, text_preprocess, trim, keyword_lookup
 
 warnings.filterwarnings("ignore", category=UserWarning)
 sns.set_style("ticks")
+parser = argparse.ArgumentParser()
+parser.add_argument("--verbose", help="Activate verbose",type=bool, nargs='?',
+                    const=True, default=False)
+args = parser.parse_args()
 
 if __name__ == '__main__':
+    verbose  = bool(args.verbose)
 
     # some flags
     dir_pdf_path = dir_path + "/pdf/"
@@ -31,10 +37,11 @@ if __name__ == '__main__':
     # load certificates
     cert_dir = dir_path + '/TestCertificats/'
 
-    begin_date = '17/2/2018'
     #keywords_preprocessed = []
     # sort by alphabetical order
     sorted_file_list = sorted(file_list)
+
+    sorted_file_list = ["Au-Yeung_Cecile_290618.pdf"]
 
     for i, file in enumerate(sorted_file_list):
         filename = os.fsdecode(file)
@@ -63,14 +70,15 @@ if __name__ == '__main__':
         txt_img = pytesseract.image_to_string(im)
         txt = text_preprocess(txt_img)
         temp = keyword_lookup(i, df_exp, filename, txt, begin_date, c_keywords)
-        #print(txt)
+        if verbose:
+            print("try 1: ", txt)
         # Keeping track of validated keywords in numeric format
         score_total = temp.iloc[:,5:9]*1
         #temp.iloc[:,5:9].sum(axis=1).values
         # If keywords are missing, applying transformations to try and find them
-        #pdb.set_trace()
+
         # Try 1 : Adaptative thresholding
-        if (score_total.transpose().iloc[:,0].sum() != 4):
+        if (score_total.sum(axis=1).values != 4):
 
             IMG0 = np.array(img)
             thresh = cv.adaptiveThreshold(IMG0,255,
@@ -85,7 +93,9 @@ if __name__ == '__main__':
 
             txt_img=pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
-            #print("1st", txt)
+            if verbose:
+                print("try 2:", txt)
+
             temp = keyword_lookup(i, df_exp, filename, txt,
                                   begin_date, c_keywords)
             score=temp.iloc[:,5:9]*1
@@ -95,13 +105,14 @@ if __name__ == '__main__':
             score_total.replace(2, 1, inplace=True)
 
         #Try 2 : Reducing image to a thumbnail
-        if (score_total.transpose().iloc[:,0].sum()!=4):
+        if (score_total.sum(axis=1).values!=4):
 
             img_thresh.thumbnail((1000,1000))
             im = trim(img_thresh)
             txt_img = pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
-            #print("2nd", txt)
+            if verbose:
+                print("try 3:", txt)
             temp = keyword_lookup(i, df_exp, filename, txt,
                                   begin_date, c_keywords)
             score = temp.iloc[:,5:9]*1
@@ -110,7 +121,7 @@ if __name__ == '__main__':
             score_total.replace(2, 1, inplace=True)
 
         #Try 3 : reducing image quality by savind a thumbnail and reloading
-        if(score_total.transpose().iloc[:,0].sum() != 4):
+        if(score_total.sum(axis=1).values != 4):
 
             img.thumbnail((1000,1000),Image.ANTIALIAS)
             # Creating a temporary pdf save
@@ -119,7 +130,8 @@ if __name__ == '__main__':
             im = trim(img)
             txt_img = pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
-            #print("3rd", txt)
+            if verbose:
+                print("try 4:", txt)
             temp = keyword_lookup(i, df_exp, filename, txt,
                                   begin_date, c_keywords)
             score = temp.iloc[:,5:9]*1
@@ -128,7 +140,7 @@ if __name__ == '__main__':
             score_total.replace(2, 1, inplace=True)
 
         # Try 4 : adaptative thresholding on the reduced quality image
-        if(score_total.transpose().iloc[:,0].sum()!=4):
+        if(score_total.sum(axis=1).values!=4):
 
             IMG0=np.array(img)
             thresh=cv.adaptiveThreshold(IMG0,255,
@@ -138,7 +150,8 @@ if __name__ == '__main__':
             im = trim(img_thresh)
             txt_img=pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
-            #print("4th", txt)
+            if verbose:
+                print("try 5:", txt)
             temp = keyword_lookup(i, df_exp, filename, txt, begin_date, c_keywords)
             score=temp.iloc[:,5:9]*1
             #print("Reduced Thresholding : ")
@@ -146,13 +159,14 @@ if __name__ == '__main__':
             score_total.replace(2,1,inplace=True)
 
         #Try 5 : Making a thumbnail of the reduced image
-        if(score_total.transpose().iloc[:,0].sum()!=4):
+        if(score_total.sum(axis=1).values!=4):
 
             img_thresh.thumbnail((1000,1000))
             im = trim(img_thresh)
             txt_img = pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
-            #print("5th", txt)
+            if verbose:
+                print("try 6:", txt)
             temp = keyword_lookup(i, df_exp, filename, txt,
                                   begin_date, c_keywords)
             score = temp.iloc[:,5:9]*1
@@ -169,90 +183,12 @@ if __name__ == '__main__':
 
         df_exp = df_exp.append(temp)
 
-    #print(df_exp)
+    if verbose:
+        print(df_exp)
 
     try:
         os.remove(dir_path+"/temp.pdf")
     except:
         pass
 
-    df_exp.to_csv(dir_path + "/df.csv", index=False)
-
-
-""" Cas à résoudre:
-
-OK! Cas n°1,2: Date non détectée (probablement la date sous forme jj-mm-aaaa)
-
-df_temp = pd.DataFrame(columns=[ "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom", "C_Prenom", "C_Date", "C_Mention"])
-filename="nom_prenom_110718.pdf"
-i=0
-txt="courses a pied  a paris     cachet  le mer. 11-07-2018 :"
-keyword_lookup(i, df_temp, filename, txt, '17/2/2018')
-
-
-OK! df_temp = pd.DataFrame(columns=[ "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom", "C_Prenom", "C_Date", "C_Mention"])
-filename="nom_prenom_050918.pdf"
-i=0
-txt="au samedi  paris, le 05-09-2018 j"
-keyword_lookup(i, df_temp, filename, txt, '17/2/2018')
-
-
-Cas n°3-7: Date non détectée (probablement date sours forme jj/mm/aa au lieu de jj/mm/aaaa)
-
-OK! df_temp = pd.DataFrame(columns=[ "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom", "C_Prenom", "C_Date", "C_Mention"])
-filename="nom_prenom_190618.pdf"
-i=0
-txt="samedi de 9h a 12h30 (en alternance)  paris, le 19/06/18."
-keyword_lookup(i, df_temp, filename, txt, '17/2/2018')
-
-OK! df_temp = pd.DataFrame(columns=[ "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom", "C_Prenom", "C_Date", "C_Mention"])
-filename="nom_prenom_050918.pdf"
-i=0
-txt="competition  paris le 05/09/18"
-keyword_lookup(i, df_temp, filename, txt, '17/2/2018')
-
-OK! df_temp = pd.DataFrame(columns=[ "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom", "C_Prenom", "C_Date", "C_Mention"])
-filename="nom_prenom_070918.pdf"
-i=0
-txt="en competiton natation en competiton  paris le : 07/09/18     membre d'un"
-keyword_lookup(i, df_temp, filename, txt, '17/2/2018')
-
-OK! df_temp = pd.DataFrame(columns=[ "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom", "C_Prenom", "C_Date", "C_Mention"])
-filename="nom_prenom_220818.pdf"
-i=0
-txt="course a pied  en competition  paris le :22/08/18"
-keyword_lookup(i, df_temp, filename, txt, '17/2/2018')
-
-OK! df_temp = pd.DataFrame(columns=[ "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom", "C_Prenom", "C_Date", "C_Mention"])
-filename="nom_prenom_060918.pdf"
-i=0
-txt="103081 8  le 06/09/18 certif"
-keyword_lookup(i, df_temp, filename, txt, '17/2/2018')
-
-OK! Cas n°8: Mention non détectée: marathon ne fait pas partie du dictionnaire des mentions
-
-df_temp = pd.DataFrame(columns=[ "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom", "C_Prenom", "C_Date", "C_Mention"])
-filename="nom_prenom_010101.pdf"
-i=0
-txt="pratique du sport en salle, en exterieur, a i'entrainement et a la competition du marathon "
-keyword_lookup(i, df_temp, filename, txt, '17/2/2018')
-
-Cas n°9: Date non détectée : la lettre û est mal lue -> autoriser un peu de flexibilité sur ce mot?
-
-OK! df_temp = pd.DataFrame(columns=[ "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom", "C_Prenom", "C_Date", "C_Mention"])
-filename="nom_prenom_280818.pdf"
-i=0
-txt="aparis 11 le 28 aodt 2018  je soussigne, dr"
-keyword_lookup(i, df_temp, filename, txt, '17/2/2018')
-
-txt="a paris ii le 28 aoiit 2018  je soussigne"
-
-Cas n° 10 : Mention non détectée: faute de frappe
-
-df_temp = pd.DataFrame(columns=[ "Nom", "Prenom", "Date", "Ext", "FileName", "C_Nom", "C_Prenom", "C_Date", "C_Mention"])
-filename="nom_prenom_280818.pdf"
-i=0
-txt = "course apieds en competition"
-keyword_lookup(i, df_temp, filename, txt, '17/2/2018')
-
-"""
+    df_exp.to_csv(dir_path + "/df_test.csv", index=False)

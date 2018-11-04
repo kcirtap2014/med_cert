@@ -109,8 +109,39 @@ def find_partial(w, txt, n_keep_char):
 
     return found
 
+def find_match(credentials, df, l_part):
+    """
+    find match in the input df
+    Parameters:
+    -----------
+    credentials: dict
+
+    """
+    found = False
+    if l_part>0:
+        cond = np.logical_and.reduce(
+        (df['Nom coureur %i' %l_part]==credentials[0].upper(),
+         df['Prénom coureur %i' %l_part]==credentials[1].upper()))
+
+    else:
+        cond = np.logical_and.reduce((df['Nom']==credentials[0].upper(),
+                          df['Prénom']==credentials[1].upper(),
+                          df["Année de naissance"]==int(credentials[2])))
+
+    new_df = df[cond]
+
+    if len(new_df) == 1:
+        found = True
+        print("Identifiant trouvé")
+    elif len(new_df)>1:
+        print("Plusieurs identifiants du même nom ont été trouvés")
+    else:
+        print("Identifant non-trouvé")
+
+    return found
+
 def keyword_lookup(current_id, df, filename, txt, begin_date, c_keywords,
-                   n_keep_char=2):
+                   n_keep_char=2, l_prod=False):
     """
     look up the keywords from extracted words of the document
 
@@ -142,9 +173,16 @@ def keyword_lookup(current_id, df, filename, txt, begin_date, c_keywords,
         result dataframe
     """
 
-    extracted = extract_name(filename)
+    extract_from_file = extract_name(filename)
+
+    if l_prod:
+        extracted = extract_from_file[1:]
+    else:
+        extracted = extract_from_file
+
     # (athle running) for license FFA
     keywords = extracted[:-1] + c_keywords
+
     keywords_preprocessed = []
 
     # prprocess keywords, special processing for tuples, make everything
@@ -165,6 +203,7 @@ def keyword_lookup(current_id, df, filename, txt, begin_date, c_keywords,
         [extracted + [filename, False, False, False, False]],
         columns=df.columns,
         index=[current_id])
+
     df = df.append(temp_df)
     dates = parse_date(txt)
 
