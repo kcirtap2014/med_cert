@@ -109,6 +109,42 @@ def find_partial(w, txt, n_keep_char):
 
     return found
 
+def thresholding(img, option=0):
+
+    if option == 1:
+        IMG0 = np.array(img)
+        thresh = cv2.adaptiveThreshold(IMG0,255,
+                                    cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                    cv2.THRESH_BINARY,15,11)
+        img_thresh = Image.fromarray(thresh)
+        im = trim(img_thresh)
+
+        # pytesseract will sometimes crash if the image is too big (but only after thresholding for some reason)
+        if (np.array(img).shape[0]*np.array(img).shape[1] > 80000000):
+            im.thumbnail((2000,2000),Image.ANTIALIAS)
+
+    elif option == 2:
+        img.thumbnail((1000,1000))
+        im = trim(img)
+
+    elif option == 3:
+        img.thumbnail((1000,1000),Image.ANTIALIAS)
+        im = trim(img)
+
+    elif option == 4:
+        IMG0=np.array(img)
+        thresh=cv.adaptiveThreshold(IMG0,255,
+                                    cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                    cv.THRESH_BINARY,15,11)
+        img_thresh=Image.fromarray(thresh)
+        im = trim(img_thresh)
+
+    else:
+        im = img
+    mat_img = np.asarray(im)
+
+    return mat_img
+
 def find_match(credentials, df, l_part):
     """
     find match in the input df
@@ -118,29 +154,58 @@ def find_match(credentials, df, l_part):
 
     """
     found = False
+    error = 0
+
     if l_part>0:
         cond = np.logical_and.reduce(
-        (df['Nom coureur %i' %l_part]==credentials[0].upper(),
-         df['Prénom coureur %i' %l_part]==credentials[1].upper()))
+        (df['Nom coureur %d' %l_part]==credentials[0].upper(),
+         df['Prénom coureur %d' %l_part]==credentials[1].upper()))
+
+        new_df = df[cond]
+
+        if len(new_df)==0:
+            if l_part==1:
+                l_part+=1
+
+            elif l_part==2:
+                l_part-=1
+
+            cond = np.logical_and.reduce(
+                (df['Nom coureur %d' %l_part]==credentials[0].upper(),
+                 df['Prénom coureur %d' %l_part]==credentials[1].upper()))
+
+            new_df = df[cond]
+            error = 2
 
     else:
         cond = np.logical_and.reduce((df['Nom']==credentials[0].upper(),
-                          df['Prénom']==credentials[1].upper(),
-                          df["Année de naissance"]==int(credentials[2])))
+                          df['Prénom']==credentials[1].upper()))
+                          #df["Année de naissance"]==int(credentials[2])))
 
-    new_df = df[cond]
+        new_df = df[cond]
+
+        if len(new_df)==0:
+            cond  = np.logical_and.reduce((
+                    df['Prénom']==credentials[0].upper(),
+                    df['Nom']==credentials[1].upper()))
+                    #df["Année de naissance"]==int(credentials[2])))
+
+            new_df = df[cond]
+            error = 1
 
     if len(new_df) == 1:
         found = True
         print("Identifiant trouvé")
+
     elif len(new_df)>1:
         print("Plusieurs identifiants du même nom ont été trouvés")
+
     else:
         print("Identifant non-trouvé")
 
-    return found
+    return found, error
 
-def keyword_lookup(current_id, df, filename, txt, begin_date, c_keywords,
+def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
                    n_keep_char=2, l_prod=False):
     """
     look up the keywords from extracted words of the document
@@ -173,11 +238,10 @@ def keyword_lookup(current_id, df, filename, txt, begin_date, c_keywords,
         result dataframe
     """
 
-    extract_from_file = extract_name(filename)
-
     if l_prod:
-        extracted = extract_from_file[1:]
+        extracted = credentials[1:]
     else:
+        extract_from_file = extract_name(credentials)
         extracted = extract_from_file
 
     # (athle running) for license FFA
@@ -200,7 +264,7 @@ def keyword_lookup(current_id, df, filename, txt, begin_date, c_keywords,
         keywords_preprocessed.append(tuple(tuple_keywords))
 
     temp_df = pd.DataFrame(
-        [extracted + [filename, False, False, False, False]],
+        [extracted + [credentials, False, False, False, False]],
         columns=df.columns,
         index=[current_id])
 

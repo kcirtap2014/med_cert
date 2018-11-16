@@ -12,6 +12,7 @@ sns.set_style('ticks')
 parser = argparse.ArgumentParser()
 parser.add_argument("--plot", help="Activate plot",type=bool, nargs='?',
                     const=True, default=False)
+parser.add_argument("--file", help="filename", nargs='?', default='/df.csv')
 args = parser.parse_args()
 
 if __name__ == '__main__':
@@ -21,7 +22,7 @@ if __name__ == '__main__':
     if not os.path.exists(fig_path):
         os.makedirs(fig_path)
 
-    df = pd.read_csv(dir_path +"/df.csv")
+    df = pd.read_csv(dir_path + str(args.file))
 
     keep_columns = ["C_Nom","C_Prenom","C_Date","C_Mention"]
     df["Score"] = df[keep_columns].sum(axis=1).values

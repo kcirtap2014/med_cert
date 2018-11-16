@@ -11,6 +11,7 @@ import warnings
 import pickle #No longer used?
 import cv2 as cv
 import pdb
+from helper_functions import thresholding
 from config import dir_path, df_exp, ext, file_list, c_keywords, begin_date
 
 #### To use directly in python , set working directory to contain helper_functions.py and the directory containing certificates
@@ -41,8 +42,6 @@ if __name__ == '__main__':
     # sort by alphabetical order
     sorted_file_list = sorted(file_list)
 
-    sorted_file_list = ["Au-Yeung_Cecile_290618.pdf"]
-
     for i, file in enumerate(sorted_file_list):
         filename = os.fsdecode(file)
         src = os.path.join(str(cert_dir), filename)
@@ -65,6 +64,9 @@ if __name__ == '__main__':
 
         # crop white space
         im = trim(img)
+        mat_img = np.asarray(im)
+        # get rid of salt and pepper noise
+        im = cv.medianBlur(mat_img, 3)
 
         # Reading text, searching for keywords
         txt_img = pytesseract.image_to_string(im)
