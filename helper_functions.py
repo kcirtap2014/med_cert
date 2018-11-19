@@ -12,6 +12,53 @@ import editdistance
 import pdb
 from unidecode import unidecode
 
+class FileHandling():
+    """
+    class that handles the file system
+    """
+
+    def __init__(df_path = None):
+        self.df_path = df_path
+
+    def load_df(self):
+        if self.df_path is None:
+            from config import df_prod
+            self.df = df_prod
+        else:
+            self.df = pd.read_csv(self.df_path)
+
+    def lookup(self, entry):
+        """
+        look up the database if the entry has already been analysed
+
+        Parameters:
+        -----------
+        entry: pandas dataframe
+
+        """
+        return entry[entry.isin(self.df)]
+
+    def save(self, save_path):
+        """
+        save df to save path in csv
+        """
+
+        self.df.to_csv(save_path, index=False)
+
+    def add(self, df_temp):
+        """
+        add rows to database
+        """
+        self.df = self.df.append(df_temp)
+
+    def delete(self, df_temp):
+        """
+        delete row from database
+        """
+        self.df = self.df[entry.isin(self.df)]
+
+
+
 def extract_name(filename):
     """
     extracts name from filename. filenames are stored as follows:
