@@ -12,31 +12,52 @@ from helper_functions import (local_thresholding, wordSegmentation,
 import matplotlib.patches as patches
 import argparse
 import cv2
+import pdb
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--plot", help="Activate plot",type=bool, nargs='?',
+                    const=True, default=False)
+parser.add_argument("--obs", help="obs data",type=bool, nargs='?',
                     const=True, default=False)
 args = parser.parse_args()
 
 # run by typing python3 segmentation.py
 if __name__ == '__main__':
-    dir_path = os.getcwd()
-    dir_pdf_path = dir_path + "/pdf/"
-    #cert_dir = dir_path + '/TestCertificats/'
-    obs_path = '/Users/pmlee/Documents/FRP/Cert_Recognition/nouvel-obs/'
-    input_path = obs_path + 'nouvel_obs_2402_gt_ocr-1.0/gt/bin'
-    #input_path = obs_path + 'input'
-    new_obs_img_path = obs_path + "img_data/"
 
-    # change the file name as you wish
-    #[f for f in os.listdir(cert_dir) if f.endswith(ext)]
-    #with open(obs_path +'/retained_file_score_0', 'rb') as fp:
-    #    file_list_crnn = pickle.load(fp)
-    file_list_crnn = os.listdir(input_path)
 
-    for i, file in enumerate(file_list_crnn):
+    if bool(args.obs):
+        dir_path = '/Users/pmlee/Documents/FRP/Cert_Recognition/nouvel-obs/'
+        input_path = dir_path + 'input/'
+        img_path = dir_path + "words/"
+
+        if os.path.exists(img_path):
+            shutil.rmtree(img_path)
+
+        elif not os.path.exists(img_path):
+            # check if fig_path exists
+            os.makedirs(img_path)
+
+        file_list_crnn = os.listdir(input_path)
+
+    else:
+        dir_path = os.getcwd()
+        dir_pdf_path = dir_path + "/pdf/"
+        cert_dir = dir_path + '/TestCertificats/'
+        input_path = dir_path + 'input/'
+        img_path = dir_path + '/img_data/'
+
+        with open(dir_path +'/retained_file_score_1', 'rb') as fp:
+            file_list_crnn = pickle.load(fp)
+
+    sorted_file_list_crnn = sorted(file_list_crnn)
+
+    counter = 0
+    for i, file in enumerate(sorted_file_list_crnn):
         filename = os.fsdecode(file)
-        src = os.path.join(str(input_path), filename)
+        if bool(args.obs):
+            src = os.path.join(input_path, filename)
+        else:
+            src = os.path.join(cert_dir, filename)
         print("%d:%s"%(i,filename))
 
         if filename.endswith(".pdf"):
@@ -55,16 +76,19 @@ if __name__ == '__main__':
         cropped_img = trim(img)
         #invert = cv2.bitwise_not(cropped_img)
         mat_img = np.asarray(cropped_img)
-        invert = cv2.bitwise_not(mat_img)
-        #mat_img = thresholding(invert, option=0)
-        bb_tuple = wordSegmentation(invert)#, kernelSize=55, sigma=211, minArea=1000)
 
-    # remove folder where images are stored
-    #shutil.rmtree(img_data_path)
-    #os.makedirs(img_data_path)
+
+        #invert = cv2.bitwise_not(mat_img)
+        #mat_img = thresholding(invert, option=0)
+        bb_tuple = wordSegmentation(mat_img)#, kernelSize=55, sigma=211, minArea=500)
+
+        # remove folder where images are stored
+        #shutil.rmtree(img_path)
+        #os.makedirs(img_path)
         rects = []
-        lot_path  = new_obs_img_path + 'lot%d/' %i
-        if not os.path.exists(lot_path):
+
+        if bool(args.obs):
+            lot_path  = img_path + 'lot%d/' %i
             os.makedirs(lot_path)
 
         for j, tup in enumerate(bb_tuple):
@@ -72,8 +96,8 @@ if __name__ == '__main__':
             rect = patches.Rectangle((x,y),w,h,linewidth=1, edgecolor='r',
                                      facecolor='none')
             rects.append(rect)
-            img = tup[1]
-            #img = Image.fromarray(tup[1])
+            #img = tup[1]
+            img = Image.fromarray(tup[1])
 
             # @Jérôme: adjustment of the contrast
             #pxmin = np.min(img)
@@ -83,10 +107,14 @@ if __name__ == '__main__':
             # increase line width
             #kernel = np.ones((3, 3), np.uint8)
             #img = cv2.erode(img, kernel, iterations = 1)
-            #img = np.array(img)
+            img = np.array(img)
 
             #txt = pytesseract.image_to_string(img)
-            cv2.imwrite(new_obs_img_path + "lot%d/img%d.png"%(i,j), img)
+            if bool(args.obs):
+                cv2.imwrite(lot_path + "img%d.png" %(j), img)
+            else:
+                cv2.imwrite(img_path + "img%d.png" %(counter), img)
+            counter+=1
 
         if bool(args.plot):
             fig, ax = plt.subplots(figsize=(6,10))

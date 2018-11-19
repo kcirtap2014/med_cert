@@ -3,7 +3,10 @@ import cv2
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageChops
+from skimage.feature import daisy, hog
 import re
+from sklearn.cluster import MiniBatchKMeans
+from skimage import filters
 from skimage.filters import threshold_local
 import editdistance
 import pdb
@@ -239,13 +242,12 @@ def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
     """
 
     if l_prod:
-        extracted = credentials[1:]
+        extracted = extract_name(credentials)
     else:
         extract_from_file = extract_name(credentials)
         extracted = extract_from_file
-
     # (athle running) for license FFA
-    keywords = extracted[:-1] + c_keywords
+    keywords = extracted[1:-1] + c_keywords
 
     keywords_preprocessed = []
 
@@ -272,7 +274,7 @@ def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
     dates = parse_date(txt)
 
     # retain only columns for tick boxes
-    cols = df.columns[5:]
+    cols = df.columns[6:]
     found = np.zeros(4) # 4 columns to check
 
     for i, keywords in enumerate(keywords_preprocessed):
@@ -287,7 +289,7 @@ def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
                 # we don't need to specify end date, if the begin time is more
                 # than 1 year before the course is supposed to take place,
                 # that should be fine
-                #end_date = pd.to_datetime(begin_date) + pd.Timedelta(weeks=52)
+                end_date = pd.to_datetime(begin_date) + pd.Timedelta(weeks=52)
 
                 for date in dates:
                     try:
@@ -295,7 +297,7 @@ def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
                         #date_match = (pd.to_datetime(date) == pd.to_datetime(key))
                         #date_match = np.logical_and(cur_date >= begin_date,
                         #                            cur_date <= end_date)
-                        date_match = (cur_date >= begin_date)
+                        date_match = np.logical_and(cur_date >= begin_date, cur_date<=end_date)
                     except ValueError:
                         date_match = False
 
@@ -337,11 +339,13 @@ def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
                         np.sum(found_temp[[4,6]]) == len(found_temp[[4,6]]),
                         np.sum(found_temp[[4,7]]) == len(found_temp[[4,7]]),
                         np.sum(found_temp[[4,5]]) == len(found_temp[[4,5]])))
+
         else:
             # for date, if we have one or more matches, that is valid
             found[i] = (np.sum(found_temp) >= len(keywords))
 
         df.at[current_id, cols[i]] = bool(found[i])
+
     # return only the latest one
     return df[-1:]
 
@@ -373,7 +377,7 @@ def replace_month(date):
         # take the first 4 letters
         month = month[:4]
         std_date = str(day)+ "/" + str(month_name[month])+ "/" +str(year)
-    except ValueError:
+    except (ValueError, KeyError):
         std_date = ""
 
     return std_date
@@ -615,3 +619,167 @@ def createKernel(kernelSize, sigma, theta):
 
     kernel = kernel / np.sum(kernel)
     return kernel
+
+def clustering(features, n_cluster):
+    """
+    perform clustering using MiniBatchKMeans
+
+    Parameters:
+    -----------
+    features: array_like
+        array of features
+
+    n_cluster: int
+        number of clusters
+
+    Returns:
+    --------
+    kmeans: scikit learn model
+    """
+    kmeans = MiniBatchKMeans(n_cluster, batch_size=n_cluster * 10)
+    kmeans.fit(features)
+
+    return kmeans
+
+def find_cluster(cluster_model, features):
+    """
+    find to which clusters each feature belongs
+
+    Parameters:
+    -----------
+    cluster_model: scikit-learn model
+
+    features: array_like
+        array of features
+    """
+    img_clusters = cluster_model.predict(features)
+    cluster_freq_counts = pd.DataFrame(
+        img_clusters, columns=['cnt'])['cnt'].value_counts()
+    bovw_vector = np.zeros(cluster_model.n_clusters)
+
+    ##feature vector of size as the total number of clusters
+    for key in cluster_freq_counts.keys():
+        bovw_vector[key] = cluster_freq_counts[key]
+
+    bovw_feature = bovw_vector / np.linalg.norm(bovw_vector)
+
+    return list(bovw_feature)
+
+def feature_engineering(img, step=32, radius=32, histograms=8, orientations=8,
+                        visualize=False, l_hog=True, l_daisy=True, l_sift=True):
+    """
+    feature engineering with HOG, DAISY and/or SIFT descriptors
+
+    Parameters:
+    -----------
+    img: input image
+
+    step: int
+        daisy descriptor parameter. it defines the step between descriptors
+
+    radius: int
+        daisy descriptor parameter. it defines the radius of the descriptor
+
+    histograms: int
+        daisy descriptor parameter. number of histograms per descriptor
+
+    orientations: int
+        daisy descriptor parameter. number of orientations per descriptor. each
+        orientation is 45°
+
+    visualize: boolean
+        true if want to return image
+
+    l_hog: boolean
+        true if use HOG descriptor
+
+    l_daisy: boolean
+        true if use DAISY descriptor
+
+    l_sift: boolean
+        true if use SIFT descriptor
+
+    Return:
+    -------
+    feature descriptors
+    """
+
+    #mat_img_filter = image_preprocessing(img)
+    mat_img = np.array(img)
+    mat_img_filter = filters.median(mat_img)
+    output = []
+
+    if l_hog:
+        if visualize:
+            fd, img_hog = hog(mat_img_filter, orientations=8, pixels_per_cell=(16, 16),
+                              cells_per_block=(1, 1), visualize=visualize,
+                              feature_vector=True)
+            output_hog = fd, img_hog
+
+        else:
+            fd = hog(mat_img_filter, orientations=8, pixels_per_cell=(16, 16),
+                     cells_per_block=(1, 1), visualize=visualize,
+                     feature_vector=True)
+            output_hog = fd
+
+        output.append(output_hog)
+
+    if l_daisy:
+        # apply daisy feature extraction
+        if visualize:
+            descs, img_daisy = daisy(mat_img_filter, step=step, rings=2,
+                                     histograms=histograms, radius=radius,
+                                     normalization='l2',
+                                     orientations=orientations,
+                                     visualize=visualize)
+
+            output_daisy = descs, img_daisy
+
+        else:
+            descs = daisy(mat_img_filter, step=step, rings=2, radius=radius,
+                          histograms=histograms, normalization='l2',
+                          orientations=orientations, visualize=visualize)
+
+            descs_num = descs.shape[0] * descs.shape[1]
+            daisy_descriptors = descs.reshape(descs_num, descs.shape[2])
+            output_daisy = daisy_descriptors
+
+        output.append(output_daisy)
+
+    if l_sift:
+
+        sift = cv2.xfeatures2d.SIFT_create()
+        # convert to gray scale
+        #img_gray = cv2.cvtColor(mat_img, cv2.COLOR_BGR2GRAY)
+
+        # denoise
+        #median_blur_img = cv2.medianBlur(img_gray, ksize=1)
+
+        # equalizer: contrast adjustment
+        img_eq = cv2.equalizeHist(img)
+
+        kp, descs = sift.detectAndCompute(img_eq, None)
+        output_sift = descs
+
+        if visualize:
+            img_sift = cv2.drawKeypoints(img_eq, kp, None,
+                                         flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+            output_sift = descs, img_sift
+
+        output.append(output_sift)
+
+    return output
+
+def image_preprocessing(img):
+    # crop white space
+    #im = trim(img)
+    mat_img = np.asarray(img)
+    # get rid of salt and pepper noise
+    # convert to gray scale as only the luminosity is important
+
+    # denoise
+    mat_img_filter = filters.median(mat_img)
+
+    # contast adjustment
+
+    return mat_img_filter
