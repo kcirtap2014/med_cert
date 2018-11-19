@@ -241,12 +241,11 @@ def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
         result dataframe
     """
 
+    extracted = extract_name(credentials)
+
     if l_prod:
-        extracted = extract_name(credentials)
         keywords = extracted[1:-1] + c_keywords
     else:
-        extract_from_file = extract_name(credentials)
-        extracted = extract_from_file
         keywords = extracted[:-1] + c_keywords
     # (athle running) for license FFA
 

@@ -42,7 +42,7 @@ if __name__ == '__main__':
     # sort by alphabetical order
     sorted_file_list = sorted(file_list)
 
-    for i, file in enumerate(sorted_file_list[:2]):
+    for i, file in enumerate(sorted_file_list):
         filename = os.fsdecode(file)
         src = os.path.join(str(cert_dir), filename)
         print("%d:%s"%(i,filename))
@@ -193,4 +193,4 @@ if __name__ == '__main__':
     except:
         pass
 
-    df_exp.to_csv(DIR_PATH + "/df_test2.csv", index=False)
+    df_exp.to_csv(DIR_PATH + "/df_test.csv", index=False)
