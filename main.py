@@ -42,7 +42,7 @@ if __name__ == '__main__':
     # sort by alphabetical order
     sorted_file_list = sorted(file_list)
 
-    for i, file in enumerate(sorted_file_list):
+    for i, file in enumerate(sorted_file_list[:2]):
         filename = os.fsdecode(file)
         src = os.path.join(str(cert_dir), filename)
         print("%d:%s"%(i,filename))
