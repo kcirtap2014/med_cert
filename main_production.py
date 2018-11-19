@@ -21,8 +21,9 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException
 import time
 from helper_functions import (rotation, text_preprocess, trim,
-                              keyword_lookup, extract_name, find_match)
-from config import DIR_PATH, c_keywords, begin_date, chrome_driver_path
+                              keyword_lookup, extract_name, find_match,
+                              FileHandling)
+from config import DIR_PATH, C_KEYWORDS, BEGIN_DATE, CHROME_DRIVER_PATH
 Image.MAX_IMAGE_PIXELS = 1000000000
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -31,13 +32,12 @@ parser.add_argument("--verbose", help="Activate verbose",type=bool, nargs='?',
                     const=True, default=False)
 args = parser.parse_args()
 
-temp_path = os.path.join(DIR_PATH, "temp_file")
-last_year_list_path = os.path.join(DIR_PATH, "list2018")
-output_path = os.path.join(DIR_PATH, "output")
+TEMP_PATH = os.path.join(DIR_PATH, "temp_file")
+OUTPUT_PATH = os.path.join(DIR_PATH, "output")
 
 # check if fig_path exists
-if not os.path.exists(temp_path):
-    os.makedirs(temp_path)
+if not os.path.exists(TEMP_PATH):
+    os.makedirs(TEMP_PATH)
 
 if __name__ == "__main__":
     verbose  = bool(args.verbose)
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     l_duo = False
 
     # set up browser
-    browser = webdriver.Chrome(chrome_driver_path)
+    browser = webdriver.Chrome(CHROME_DRIVER_PATH)
     browser.get(url)
     # login
     browser.find_element_by_name('login').send_keys(values['login'])
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     for i in range(3):
         # re-initialise fh.df each time
-        save_path = os.path.join(output_path, df_save[i])
+        save_path = os.path.join(OUTPUT_PATH, df_save[i])
         fh = FileHandling(df_path = save_path)
         fh.load_df()
 
@@ -95,7 +95,7 @@ if __name__ == "__main__":
         #litige_patrick= soup.findAll(attrs={'id':re.compile("tr1_1479387")})
 
         #for j, element in enumerate(litige_patrick):#litige_img_list[-1:]):
-        for j, element in enumerate(litige_img_list[2:4]):
+        for j, element in enumerate(litige_img_list):
 
             #id_url = re.compile(r'\"\/IEL_orgaInscriptionCoureur.php\?(.*)\"').findall(str(element))[0]
             id = element.attrs.get('id').split('_')[-1]
@@ -109,24 +109,23 @@ if __name__ == "__main__":
                 print("%d:%s"%(j,filename))
 
                 credentials = filename#extract_name(filename)[1:]
-                entry = extract_filename(credentials)
-                pdb.set_trace()
-                entry_found = fh.df(entry)
+                # do not take extension and year, that's y -2
+                entry = extract_name(credentials)[:-2]
+                #pd.DataFrame([extract_name(credentials)[:-1]],
+                #                     columns = fh.df.columns[:4])
+
+                entry_found = fh.lookup(entry)
                 #valid_registration, error = find_match(credentials, df_last_year, l_part)
 
-                #if error==1:
-                #    temp = credentials
-                #    credentials = [temp[1]] + [temp[0]] + temp[2:]
-
                 if not entry_found:
-                    src = temp_path + filename
+                    src = os.path.join(TEMP_PATH, filename)
                     i_url = i_url.replace(' ','%20')
                     urlretrieve(i_url, src)
 
                     try:
                         if not filename.endswith(".pdf"):
-                            src_pdf = temp_path + filename.split('.')[0] + ".pdf"
-
+                            src_pdf = TEMP_PATH +'/'+ filename.split('.')[0] + ".pdf"
+                            print(src_path)
                             if not os.path.isfile(src_pdf):
                                 # convert other ext files to pdf if not found in DIR_PATH_pdf
                                 im_temp = Image.open(src).convert('L')
@@ -151,8 +150,8 @@ if __name__ == "__main__":
                         if verbose:
                             print("try 1:", txt)
 
-                        temp = keyword_lookup(j, fh.df, credentials, txt, begin_date,
-                                              c_keywords, l_prod=True)
+                        temp = keyword_lookup(j, fh.df, credentials, txt, BEGIN_DATE,
+                                              C_KEYWORDS, l_prod=True)
                         score_total = temp.iloc[:,6:]*1
                         #temp.iloc[:,5:9].sum(axis=1).values
                         # If keywords are missing, applying transformations to try and find them
@@ -176,7 +175,7 @@ if __name__ == "__main__":
                                 print("try 2:", txt)
 
                             temp = keyword_lookup(j, fh.df, filename, txt,
-                                                  begin_date, c_keywords, l_prod=True)
+                                                  BEGIN_DATE, C_KEYWORDS, l_prod=True)
                             score=temp.iloc[:,6:]*1
                             #print("Thresholding")
                             #Adding newly validated mentions to the tracker
@@ -194,7 +193,7 @@ if __name__ == "__main__":
                                 print("try 3:", txt)
 
                             temp = keyword_lookup(j, fh.df, filename, txt,
-                                                  begin_date, c_keywords, l_prod=True)
+                                                  BEGIN_DATE, C_KEYWORDS, l_prod=True)
                             score = temp.iloc[:,6:]*1
                             #print("Thumbnail")
                             score_total += score
@@ -205,9 +204,9 @@ if __name__ == "__main__":
 
                             img.thumbnail((1000,1000),Image.ANTIALIAS)
                             # Creating a temporary pdf save
-                            img.save(temp_path+"/temp.pdf")
+                            img.save(TEMP_PATH+"/temp.pdf")
 
-                            img = convert_from_path(temp_path+"/temp.pdf", fmt="png")[0].convert('L')
+                            img = convert_from_path(TEMP_PATH+"/temp.pdf", fmt="png")[0].convert('L')
                             im = trim(img)
                             txt_img = pytesseract.image_to_string(im)
                             txt = text_preprocess(txt_img)
@@ -215,7 +214,7 @@ if __name__ == "__main__":
                                 print("try 4:", txt)
 
                             temp = keyword_lookup(j, fh.df, filename, txt,
-                                                  begin_date, c_keywords, l_prod=True)
+                                                  BEGIN_DATE, C_KEYWORDS, l_prod=True)
                             score = temp.iloc[:,6:]*1
                             #print("Reduce")
                             score_total += score
@@ -235,8 +234,8 @@ if __name__ == "__main__":
                             if verbose:
                                 print("try 5:", txt)
 
-                            temp = keyword_lookup(j, fh.df, filename, txt, begin_date,
-                                                  c_keywords, l_prod=True)
+                            temp = keyword_lookup(j, fh.df, filename, txt, BEGIN_DATE,
+                                                  C_KEYWORDS, l_prod=True)
                             score = temp.iloc[:,6:]*1
                             #print("Reduced Thresholding : ")
                             score_total += score
@@ -253,7 +252,7 @@ if __name__ == "__main__":
                                 print("try 6:", txt)
 
                             temp = keyword_lookup(j, fh.df, filename, txt,
-                                                  begin_date, c_keywords, l_prod=True)
+                                                  BEGIN_DATE, C_KEYWORDS, l_prod=True)
                             score = temp.iloc[:,6:]*1
                             #print("Reduced thumbnail : ")
                             score_total += score
@@ -274,7 +273,7 @@ if __name__ == "__main__":
                         if score!=4:
                             # keep only cases that are different from 4 for
                             # improvement purpose
-                            fh.df.add(temp)
+                            fh.add(temp)
 
                         if verbose:
                             print(fh.df)
@@ -315,14 +314,16 @@ if __name__ == "__main__":
                             [extracted + [credentials, False, False, False, False]],
                             columns=fh.df.columns,
                             index=[j])
-                        fh.df.add(temp)
+                        fh.add(temp)
                         print("invalid PDF file")
                 else:
-                    fh.df.delete(entry)
-            #writer = pd.ExcelWriter(os.join.path(output_path, df_save[i]))
+                    print('Certificat déjà examiné')
+
+        fh.delete()
+            #writer = pd.ExcelWriter(os.join.path(OUTPUT_PATH, df_save[i]))
             #fh.df.to_excel(writer, index=False)
 
-            fh.df.save(save_path)
+        fh.save()
 
     browser.quit()
-    shutil.rmtree(temp_path)
+    shutil.rmtree(TEMP_PATH)
