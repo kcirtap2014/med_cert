@@ -70,35 +70,40 @@ if __name__ == '__main__':
         im = cv.medianBlur(mat_img, 3)
 
         # Reading text, searching for keywords
-        
-        
-# Bug report : tesseract can't seem to read from images in array format
-# Solved by turning back to Image object
-        im=Image.fromarray(im)
+        # Bug report : tesseract can't seem to read from images in array format
+        # Solved by turning back to Image object
+        im = Image.fromarray(im)
         txt_img = pytesseract.image_to_string(im)
         txt = text_preprocess(txt_img)
         temp = keyword_lookup(i, df_exp, filename, txt, BEGIN_DATE, C_KEYWORDS)
+
         if verbose:
             print("try 1: ", txt)
         # Keeping track of validated keywords in numeric format
         score_total = temp.iloc[:,5:9]*1
-        #temp.iloc[:,5:9].sum(axis=1).values
+
         # If keywords are missing, applying transformations to try and find them
         option = 0
-        img2=copy(img)
+        img2 = copy(img)
+
         while((score_total.sum(axis=1).values != 4) and (option < 5)):
             option += 1
-            img,img2 = thresholding(img, img2, DIR_PATH, option)
+            img, img2 = thresholding(img, img2, DIR_PATH, option)
             im = trim(img2)
-            txt_img=pytesseract.image_to_string(im)
+            txt_img = pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
+
             if verbose:
                 print("try ", option + 1,":", txt)
+
             temp = keyword_lookup(i, df_exp, filename, txt,
                                   BEGIN_DATE, C_KEYWORDS)
-            score=temp.iloc[:,5:9]*1
+            score = temp.iloc[:,5:9]*1
             score_total += score
-            print(score_total)
+
+            if verbose:
+                print(score_total)
+
             score_total.replace(2, 1, inplace=True)
 
         for f in score_total.columns:
