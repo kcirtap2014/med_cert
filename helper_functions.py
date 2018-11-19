@@ -57,8 +57,6 @@ class FileHandling():
         """
         self.df = self.df[entry.isin(self.df)]
 
-
-
 def extract_name(filename):
     """
     extracts name from filename. filenames are stored as follows:
