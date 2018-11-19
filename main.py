@@ -12,7 +12,7 @@ import pickle #No longer used?
 import cv2 as cv
 import pdb
 from helper_functions import thresholding
-from config import dir_path, df_exp, ext, file_list, c_keywords, begin_date
+from config import DIR_PATH, df_exp, ext, file_list, C_KEYWORDS, BEGIN_DATE
 
 #### To use directly in python , set working directory to contain helper_functions.py and the directory containing certificates
 #### os.chdir("Desktop/Certificats/Cert_Recognition/")
@@ -33,10 +33,10 @@ if __name__ == '__main__':
     verbose  = bool(args.verbose)
 
     # some flags
-    dir_pdf_path = dir_path + "/pdf/"
+    dir_pdf_path = DIR_PATH + "/pdf/"
 
     # load certificates
-    cert_dir = dir_path + '/TestCertificats/'
+    cert_dir = DIR_PATH + '/TestCertificats/'
 
     #keywords_preprocessed = []
     # sort by alphabetical order
@@ -51,7 +51,7 @@ if __name__ == '__main__':
             src_pdf = dir_pdf_path + filename.split('.')[0] + ".pdf"
 
             if not os.path.isfile(src_pdf):
-                # convert other ext files to pdf if not found in dir_path_pdf
+                # convert other ext files to pdf if not found in DIR_PATH_pdf
                 im_temp = Image.open(src).convert('L')
                 # crop white space
                 #im_temp = trim(im_temp)
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         # Reading text, searching for keywords
         txt_img = pytesseract.image_to_string(im)
         txt = text_preprocess(txt_img)
-        temp = keyword_lookup(i, df_exp, filename, txt, begin_date, c_keywords)
+        temp = keyword_lookup(i, df_exp, filename, txt, BEGIN_DATE, C_KEYWORDS)
         if verbose:
             print("try 1: ", txt)
         # Keeping track of validated keywords in numeric format
@@ -99,7 +99,7 @@ if __name__ == '__main__':
                 print("try 2:", txt)
 
             temp = keyword_lookup(i, df_exp, filename, txt,
-                                  begin_date, c_keywords)
+                                  BEGIN_DATE, C_KEYWORDS)
             score=temp.iloc[:,5:9]*1
             #print("Thresholding")
             #Adding newly validated mentions to the tracker
@@ -116,7 +116,7 @@ if __name__ == '__main__':
             if verbose:
                 print("try 3:", txt)
             temp = keyword_lookup(i, df_exp, filename, txt,
-                                  begin_date, c_keywords)
+                                  BEGIN_DATE, C_KEYWORDS)
             score = temp.iloc[:,5:9]*1
             #print("Thumbnail")
             score_total += score
@@ -127,15 +127,15 @@ if __name__ == '__main__':
 
             img.thumbnail((1000,1000),Image.ANTIALIAS)
             # Creating a temporary pdf save
-            img.save(dir_path+"/temp.pdf")
-            img = convert_from_path(dir_path+"/temp.pdf", fmt="png")[0].convert('L')
+            img.save(DIR_PATH+"/temp.pdf")
+            img = convert_from_path(DIR_PATH+"/temp.pdf", fmt="png")[0].convert('L')
             im = trim(img)
             txt_img = pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
             if verbose:
                 print("try 4:", txt)
             temp = keyword_lookup(i, df_exp, filename, txt,
-                                  begin_date, c_keywords)
+                                  BEGIN_DATE, C_KEYWORDS)
             score = temp.iloc[:,5:9]*1
             #print("Reduce")
             score_total += score
@@ -154,7 +154,7 @@ if __name__ == '__main__':
             txt = text_preprocess(txt_img)
             if verbose:
                 print("try 5:", txt)
-            temp = keyword_lookup(i, df_exp, filename, txt, begin_date, c_keywords)
+            temp = keyword_lookup(i, df_exp, filename, txt, BEGIN_DATE, C_KEYWORDS)
             score=temp.iloc[:,5:9]*1
             #print("Reduced Thresholding : ")
             score_total+=score
@@ -170,7 +170,7 @@ if __name__ == '__main__':
             if verbose:
                 print("try 6:", txt)
             temp = keyword_lookup(i, df_exp, filename, txt,
-                                  begin_date, c_keywords)
+                                  BEGIN_DATE, C_KEYWORDS)
             score = temp.iloc[:,5:9]*1
             #print("Reduced thumbnail : ")
             score_total += score
@@ -189,8 +189,8 @@ if __name__ == '__main__':
         print(df_exp)
 
     try:
-        os.remove(dir_path+"/temp.pdf")
+        os.remove(DIR_PATH+"/temp.pdf")
     except:
         pass
 
-    df_exp.to_csv(dir_path + "/df_test.csv", index=False)
+    df_exp.to_csv(DIR_PATH + "/df_test.csv", index=False)
