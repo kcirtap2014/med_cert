@@ -11,6 +11,7 @@ from skimage.filters import threshold_local
 import editdistance
 import pdb
 from unidecode import unidecode
+from pdf2image import convert_from_path
 
 def extract_name(filename):
     """
@@ -112,41 +113,41 @@ def find_partial(w, txt, n_keep_char):
 
     return found
 
-def thresholding(img, option=0):
+def thresholding(img, img2, DIR_PATH, option = 0):
 
     if option == 1:
         IMG0 = np.array(img)
         thresh = cv2.adaptiveThreshold(IMG0,255,
                                     cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                     cv2.THRESH_BINARY,15,11)
-        img_thresh = Image.fromarray(thresh)
-        im = trim(img_thresh)
+        img2 = Image.fromarray(thresh)
+        
 
         # pytesseract will sometimes crash if the image is too big (but only after thresholding for some reason)
         if (np.array(img).shape[0]*np.array(img).shape[1] > 80000000):
-            im.thumbnail((2000,2000),Image.ANTIALIAS)
+            img2.thumbnail((2000,2000),Image.ANTIALIAS)
+
 
     elif option == 2:
-        img.thumbnail((1000,1000))
-        im = trim(img)
+        img2.thumbnail((1000,1000))
 
     elif option == 3:
         img.thumbnail((1000,1000),Image.ANTIALIAS)
-        im = trim(img)
+        img.save(DIR_PATH+"/temp.pdf")
+        img = convert_from_path(DIR_PATH+"/temp.pdf", fmt="png")[0].convert('L')
 
     elif option == 4:
         IMG0=np.array(img)
-        thresh=cv.adaptiveThreshold(IMG0,255,
-                                    cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                    cv.THRESH_BINARY,15,11)
-        img_thresh=Image.fromarray(thresh)
-        im = trim(img_thresh)
+        thresh=cv2.adaptiveThreshold(IMG0,255,
+                                    cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                    cv2.THRESH_BINARY,15,11)
+        img2=Image.fromarray(thresh)
 
     else:
-        im = img
-    mat_img = np.asarray(im)
+        img2.thumbnail((1000,1000))
+    
+    return img, img2
 
-    return mat_img
 
 def find_match(credentials, df, l_part):
     """
