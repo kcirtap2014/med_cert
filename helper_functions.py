@@ -243,11 +243,12 @@ def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
 
     if l_prod:
         extracted = extract_name(credentials)
+        keywords = extracted[1:-1] + c_keywords
     else:
         extract_from_file = extract_name(credentials)
         extracted = extract_from_file
+        keywords = extracted[:-1] + c_keywords
     # (athle running) for license FFA
-    keywords = extracted[1:-1] + c_keywords
 
     keywords_preprocessed = []
 
@@ -274,7 +275,10 @@ def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
     dates = parse_date(txt)
 
     # retain only columns for tick boxes
-    cols = df.columns[6:]
+    if l_prod:
+        cols = df.columns[6:]
+    else:
+        cols = df.columns[5:]
     found = np.zeros(4) # 4 columns to check
 
     for i, keywords in enumerate(keywords_preprocessed):
