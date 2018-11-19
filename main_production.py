@@ -22,7 +22,7 @@ from selenium.common.exceptions import TimeoutException
 import time
 from helper_functions import (rotation, text_preprocess, trim,
                               keyword_lookup, extract_name, find_match)
-from config import dir_path, c_keywords, begin_date, chrome_driver_path
+from config import DIR_PATH, c_keywords, begin_date, chrome_driver_path
 Image.MAX_IMAGE_PIXELS = 1000000000
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -31,9 +31,9 @@ parser.add_argument("--verbose", help="Activate verbose",type=bool, nargs='?',
                     const=True, default=False)
 args = parser.parse_args()
 
-temp_path = dir_path + "/temp_file/"
-last_year_list_path = dir_path +"/list2018/"
-output_path = dir_path +"/output/"
+temp_path = os.path.join(DIR_PATH, "temp_file")
+last_year_list_path = os.path.join(DIR_PATH, "list2018")
+output_path = os.path.join(DIR_PATH, "output")
 
 # check if fig_path exists
 if not os.path.exists(temp_path):
@@ -66,9 +66,11 @@ if __name__ == "__main__":
     schar = np.arange(3,6)
     df_save = ["df_10km.csv", "df_5km_cupid.csv", "df_5km_duo.csv"]
 
-    for i in range(2,3):
-        # re-initialise df_prod each time
-        from config import df_prod
+    for i in range(3):
+        # re-initialise fh.df each time
+        save_path = os.path.join(output_path, df_save[i])
+        fh = FileHandling(df_path = save_path)
+        fh.load_df()
 
         if i==2:
             #only activate when it's for duo category
@@ -76,11 +78,7 @@ if __name__ == "__main__":
 
         quote_page = 'https://www.topchrono.biz/IEL_orgaInscriptionCoureur.php?idCourse=1231%s&idInsc=740%s&changeTri=4' % (str(fchar[i]), str(schar[i]))
 
-        list_last_year = last_year_list_path + "inscriptions_%d.xls" %(i+1)
         l_part = 0
-        df_last_year = pd.read_excel(list_last_year)
-        df_savename = '/df_%d' %(i+1)
-
         #&changeTri=4 if want to arange by date
         browser.get(quote_page)
         xpath = "//a[contains(text(), 'Cliquez ici pour afficher tout')]"
@@ -97,7 +95,7 @@ if __name__ == "__main__":
         #litige_patrick= soup.findAll(attrs={'id':re.compile("tr1_1479387")})
 
         #for j, element in enumerate(litige_patrick):#litige_img_list[-1:]):
-        for j, element in enumerate(litige_img_list):
+        for j, element in enumerate(litige_img_list[2:4]):
 
             #id_url = re.compile(r'\"\/IEL_orgaInscriptionCoureur.php\?(.*)\"').findall(str(element))[0]
             id = element.attrs.get('id').split('_')[-1]
@@ -111,13 +109,16 @@ if __name__ == "__main__":
                 print("%d:%s"%(j,filename))
 
                 credentials = filename#extract_name(filename)[1:]
+                entry = extract_filename(credentials)
+                pdb.set_trace()
+                entry_found = fh.df(entry)
                 #valid_registration, error = find_match(credentials, df_last_year, l_part)
 
                 #if error==1:
                 #    temp = credentials
                 #    credentials = [temp[1]] + [temp[0]] + temp[2:]
 
-                if True:
+                if not entry_found:
                     src = temp_path + filename
                     i_url = i_url.replace(' ','%20')
                     urlretrieve(i_url, src)
@@ -127,7 +128,7 @@ if __name__ == "__main__":
                             src_pdf = temp_path + filename.split('.')[0] + ".pdf"
 
                             if not os.path.isfile(src_pdf):
-                                # convert other ext files to pdf if not found in dir_path_pdf
+                                # convert other ext files to pdf if not found in DIR_PATH_pdf
                                 im_temp = Image.open(src).convert('L')
                                 # crop white space
                                 im_temp = trim(im_temp)
@@ -150,7 +151,7 @@ if __name__ == "__main__":
                         if verbose:
                             print("try 1:", txt)
 
-                        temp = keyword_lookup(j, df_prod, credentials, txt, begin_date,
+                        temp = keyword_lookup(j, fh.df, credentials, txt, begin_date,
                                               c_keywords, l_prod=True)
                         score_total = temp.iloc[:,6:]*1
                         #temp.iloc[:,5:9].sum(axis=1).values
@@ -174,7 +175,7 @@ if __name__ == "__main__":
                             if verbose:
                                 print("try 2:", txt)
 
-                            temp = keyword_lookup(j, df_prod, filename, txt,
+                            temp = keyword_lookup(j, fh.df, filename, txt,
                                                   begin_date, c_keywords, l_prod=True)
                             score=temp.iloc[:,6:]*1
                             #print("Thresholding")
@@ -192,7 +193,7 @@ if __name__ == "__main__":
                             if verbose:
                                 print("try 3:", txt)
 
-                            temp = keyword_lookup(j, df_prod, filename, txt,
+                            temp = keyword_lookup(j, fh.df, filename, txt,
                                                   begin_date, c_keywords, l_prod=True)
                             score = temp.iloc[:,6:]*1
                             #print("Thumbnail")
@@ -213,7 +214,7 @@ if __name__ == "__main__":
                             if verbose:
                                 print("try 4:", txt)
 
-                            temp = keyword_lookup(j, df_prod, filename, txt,
+                            temp = keyword_lookup(j, fh.df, filename, txt,
                                                   begin_date, c_keywords, l_prod=True)
                             score = temp.iloc[:,6:]*1
                             #print("Reduce")
@@ -234,7 +235,7 @@ if __name__ == "__main__":
                             if verbose:
                                 print("try 5:", txt)
 
-                            temp = keyword_lookup(j, df_prod, filename, txt, begin_date,
+                            temp = keyword_lookup(j, fh.df, filename, txt, begin_date,
                                                   c_keywords, l_prod=True)
                             score = temp.iloc[:,6:]*1
                             #print("Reduced Thresholding : ")
@@ -251,7 +252,7 @@ if __name__ == "__main__":
                             if verbose:
                                 print("try 6:", txt)
 
-                            temp = keyword_lookup(j, df_prod, filename, txt,
+                            temp = keyword_lookup(j, fh.df, filename, txt,
                                                   begin_date, c_keywords, l_prod=True)
                             score = temp.iloc[:,6:]*1
                             #print("Reduced thumbnail : ")
@@ -273,10 +274,10 @@ if __name__ == "__main__":
                         if score!=4:
                             # keep only cases that are different from 4 for
                             # improvement purpose
-                            df_prod = df_prod.append(temp)
+                            fh.df.add(temp)
 
                         if verbose:
-                            print(df_prod)
+                            print(fh.df)
 
                         if score == 4:
                             print("Certificat est validé")
@@ -312,13 +313,16 @@ if __name__ == "__main__":
                         extracted = extract_name(credentials)
                         temp = pd.DataFrame(
                             [extracted + [credentials, False, False, False, False]],
-                            columns=df_prod.columns,
+                            columns=fh.df.columns,
                             index=[j])
-                        df_prod = df_prod.append(temp)
+                        fh.df.add(temp)
                         print("invalid PDF file")
+                else:
+                    fh.df.delete(entry)
             #writer = pd.ExcelWriter(os.join.path(output_path, df_save[i]))
-            #df_prod.to_excel(writer, index=False)
-            df_prod.to_csv(os.path.join(output_path, df_save[i]), index=False)
+            #fh.df.to_excel(writer, index=False)
+
+            fh.df.save(save_path)
 
     browser.quit()
     shutil.rmtree(temp_path)
