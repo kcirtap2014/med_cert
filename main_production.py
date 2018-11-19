@@ -125,7 +125,6 @@ if __name__ == "__main__":
                     try:
                         if not filename.endswith(".pdf"):
                             src_pdf = TEMP_PATH +'/'+ filename.split('.')[0] + ".pdf"
-                            print(src_path)
                             if not os.path.isfile(src_pdf):
                                 # convert other ext files to pdf if not found in DIR_PATH_pdf
                                 im_temp = Image.open(src).convert('L')
