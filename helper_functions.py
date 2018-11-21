@@ -13,6 +13,63 @@ import pdb
 from unidecode import unidecode
 from pdf2image import convert_from_path
 
+class FileHandling():
+    """
+    class that handles the file system
+    """
+
+    def __init__(self, df_path = None):
+        self.df_path = df_path
+
+    def load_df(self):
+        if self.df_path is None:
+            from config import df_prod
+            self.df = df_prod
+        else:
+            self.df = pd.read_csv(self.df_path)
+
+        self.keep_cols = self.df.columns.tolist()[:3]
+        self.touched = pd.Series([False]*self.df.shape[0],
+                                 index = self.df.index)
+        self.touched.name = 'touched'
+
+    def lookup(self, entry):
+        """
+        look up the database if the entry has already been analysed
+
+        Parameters:
+        -----------
+        entry: pandas dataframe
+
+        """
+        index_entry = self.df[self.df[self.keep_cols].
+                            isin(entry).all(axis=1)].index
+        self.touched.loc[index_entry] = True
+        return self.df[self.keep_cols].isin(entry).all(axis=1).any()
+
+    def save(self):
+        """
+        save df to save path in csv
+        """
+
+        self.df.to_csv(self.df_path, index=False)
+
+    def add(self, df_temp):
+        """
+        add rows to database
+        """
+        self.df = self.df.append(df_temp)
+        # index of self.touched is the last one we added
+        self.touched = self.touched.append(pd.Series([True],
+                                index=[self.df.index[-1]]))
+
+    def delete(self):
+        """
+        delete row from database
+        """
+        index_touched =  self.touched[self.touched].index
+        self.df = self.df.loc[index_touched]
+
 def extract_name(filename):
     """
     extracts name from filename. filenames are stored as follows:
@@ -115,6 +172,12 @@ def find_partial(w, txt, n_keep_char):
 
 def thresholding(img, img2, DIR_PATH, option = 0):
 
+    if option == 0:
+        im = trim(img)
+        mat_img = np.asarray(im)
+        im = cv2.medianBlur(mat_img, 3)
+        img2 = Image.fromarray(im)
+   
     if option == 1:
         IMG0 = np.array(img)
         thresh = cv2.adaptiveThreshold(IMG0,255,
@@ -242,13 +305,13 @@ def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
         result dataframe
     """
 
+    extracted = extract_name(credentials)
+
     if l_prod:
-        extracted = extract_name(credentials)
+        keywords = extracted[1:-1] + c_keywords
     else:
-        extract_from_file = extract_name(credentials)
-        extracted = extract_from_file
+        keywords = extracted[:-1] + c_keywords
     # (athle running) for license FFA
-    keywords = extracted[1:-1] + c_keywords
 
     keywords_preprocessed = []
 
@@ -275,7 +338,10 @@ def keyword_lookup(current_id, df, credentials, txt, begin_date, c_keywords,
     dates = parse_date(txt)
 
     # retain only columns for tick boxes
-    cols = df.columns[6:]
+    if l_prod:
+        cols = df.columns[6:]
+    else:
+        cols = df.columns[5:]
     found = np.zeros(4) # 4 columns to check
 
     for i, keywords in enumerate(keywords_preprocessed):

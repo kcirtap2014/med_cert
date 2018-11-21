@@ -63,43 +63,35 @@ if __name__ == '__main__':
         else:
             img = convert_from_path(src, fmt="png")[0].convert('L')
 
-        # crop white space
-        im = trim(img)
-        mat_img = np.asarray(im)
-        # get rid of salt and pepper noise
-        im = cv.medianBlur(mat_img, 3)
-
-        # Reading text, searching for keywords
-        
-        
-# Bug report : tesseract can't seem to read from images in array format
-# Solved by turning back to Image object
-        im=Image.fromarray(im)
-        txt_img = pytesseract.image_to_string(im)
-        txt = text_preprocess(txt_img)
-        temp = keyword_lookup(i, df_exp, filename, txt, BEGIN_DATE, C_KEYWORDS)
-        if verbose:
-            print("try 1: ", txt)
-        # Keeping track of validated keywords in numeric format
-        score_total = temp.iloc[:,5:9]*1
-        #temp.iloc[:,5:9].sum(axis=1).values
-        # If keywords are missing, applying transformations to try and find them
+        # Setting variables for the loop
         option = 0
-        img2=copy(img)
-        while((score_total.sum(axis=1).values != 4) and (option < 5)):
-            option += 1
-            img,img2 = thresholding(img, img2, DIR_PATH, option)
+        img2 = copy(img)
+        score_total = pd.DataFrame(data=[[0,0,0,0]], 
+                                   columns=["C_Nom","C_Prenom",
+                                            "C_Date","C_Mention"],
+                                            index = [i])
+        
+        # Attempting to read text from images with various processing options
+        while((score_total.sum(axis=1).values != 4) and (option < 6)):
+            
+            img, img2 = thresholding(img, img2, DIR_PATH, option)
             im = trim(img2)
-            txt_img=pytesseract.image_to_string(im)
+            txt_img = pytesseract.image_to_string(im)
             txt = text_preprocess(txt_img)
+
             if verbose:
                 print("try ", option + 1,":", txt)
+
             temp = keyword_lookup(i, df_exp, filename, txt,
                                   BEGIN_DATE, C_KEYWORDS)
-            score=temp.iloc[:,5:9]*1
+            score = temp.iloc[:,5:9]*1
             score_total += score
-            print(score_total)
+
+            if verbose:
+                print(score_total)
+
             score_total.replace(2, 1, inplace=True)
+            option += 1
 
         for f in score_total.columns:
             if(int(score_total[f][:1])==1):
