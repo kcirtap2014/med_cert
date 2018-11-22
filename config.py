@@ -6,8 +6,13 @@ import pandas as pd
 DIR_PATH = os.getcwd()
 
 # load certificates
-cert_dir = DIR_PATH + '/TestCertificats/'
+CERT_PATH= os.path.join(DIR_PATH, 'TestCertificats')
 CHROME_DRIVER_PATH = '/Users/pmlee/Documents/chrome/chromedriver'
+OSB_PATH = os.path.join(DIR_PATH, 'nouvel-obs')
+MODEL_PATH = os.path.join(DIR_PATH, 'model')
+PDF_PATH = os.path.join(DIR_PATH, 'pdf')
+TEMP_PATH = os.path.join(DIR_PATH, "temp_file")
+OUTPUT_PATH = os.path.join(DIR_PATH, "output")
 
 # prepare an empty DataFrame
 df_exp = pd.DataFrame(columns=[
@@ -18,9 +23,10 @@ df_prod = pd.DataFrame(columns=[
       "R_Date","Nom", "Prenom", "Year", "Ext", "FileName", "C_Nom",
       "C_Prenom", "C_Date", "C_Mention"])
 
+keep_columns = ["C_Nom","C_Prenom","C_Date","C_Mention"]
 # define file_list
 ext = tuple(['pdf', 'jpg', 'jpeg', 'png'])
-file_list = [f for f in os.listdir(cert_dir) if f.endswith(ext)]
+file_list = [f for f in os.listdir(CERT_PATH) if f.endswith(ext)]
 C_KEYWORDS = [("athle", "running", "course", "pied", "compétition",
                  "athlétisme", "semi-marathon", "marathon")]
 BEGIN_DATE = '17/2/2018'
