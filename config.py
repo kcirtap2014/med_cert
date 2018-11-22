@@ -8,8 +8,8 @@ DIR_PATH = os.getcwd()
 # load certificates
 CERT_PATH= os.path.join(DIR_PATH, 'TestCertificats')
 CHROME_DRIVER_PATH = '/Users/pmlee/Documents/chrome/chromedriver'
-OSB_PATH = os.path.join(DIR_PATH, 'nouvel-obs')
-MODEL_PATH = os.path.join(DIR_PATH, 'model')
+OSB_PATH = os.path.join(os.path.dirname(DIR_PATH), 'nouvel-obs')
+MODEL_PATH = os.path.join(os.path.dirname(DIR_PATH), 'model')
 PDF_PATH = os.path.join(DIR_PATH, 'pdf')
 TEMP_PATH = os.path.join(DIR_PATH, "temp_file")
 OUTPUT_PATH = os.path.join(DIR_PATH, "output")

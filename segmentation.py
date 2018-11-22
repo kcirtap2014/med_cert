@@ -8,12 +8,13 @@ import matplotlib.pylab as plt
 from pdf2image import convert_from_path
 from skimage.filters import threshold_otsu
 from helper_functions import (local_thresholding, wordSegmentation,
-                              trim, thresholding, rotation, feature_engineering)
+                              trim, thresholding, rotation, feature_engineering,
+                              find_cluster)
 import matplotlib.patches as patches
 import argparse
 import cv2
 import pdb
-import joblib
+from joblib import load
 from collections import defaultdict
 from config import DIR_PATH, MODEL_PATH, CERT_PATH, OBS_PATH, PDF_PATH
 
@@ -26,7 +27,6 @@ args = parser.parse_args()
 
 # run by typing python3 segmentation.py
 if __name__ == '__main__':
-
 
     if bool(args.obs):
         INPUT_PATH = os.path.join(OBS_PATH, 'input')
@@ -44,8 +44,10 @@ if __name__ == '__main__':
     else:
         INPUT_PATH = os.path.join(DIR_PATH, 'input')
         IMG_PATH = os.path.join(DIR_PATH,'img_data')
+        kmeans = load(os.path.join(MODEL_PATH,'kmeans.joblib'))
+        clf_lr = load(os.path.join(MODEL_PATH,'clf_lr.joblib'))
 
-        with open(DIR_PATH +'/retained_file_score_1', 'rb') as fp:
+        with open(os.path.join(DIR_PATH, 'retained_file_score_1'), 'rb') as fp:
             file_list_crnn = pickle.load(fp)
 
     sorted_file_list_crnn = sorted(file_list_crnn)
@@ -90,6 +92,8 @@ if __name__ == '__main__':
         else:
             LOT_PATH = os.path.join(IMG_PATH, filename.split('.')[0])
 
+        data = []
+
         for j, tup in enumerate(bb_tuple):
             x, y, w, h = tup[0]
             rect = patches.Rectangle((x,y),w,h,linewidth=1, edgecolor='r',
@@ -97,22 +101,20 @@ if __name__ == '__main__':
             rects.append(rect)
             #img = tup[1]
             img = Image.fromarray(tup[1])
-            img = image_preprocessing(img)
-            cert_features = defaultdict()
+            SAVE_PATH = os.path.join(LOT_PATH, '%d_%d_img.png' %(x,y))
 
-            if not bool(args.obs):
+            if bool(args.obs):
+                cv2.imwrite(SAVE_PATH, img)
+
+            else:
+                img = image_preprocessing(img)
+                cert_features = defaultdict()
                 output = feature_engineering(img, l_daisy=False, l_hog=False)
 
                 if not output[0] is None:
-                    cert_features[i] = output[0]
-
-                X_cert = []
-
-                for key, features in cert_features.items():
-                    bovw_feature_cert = find_cluster(kmeans, features)
-                    X_cert.append(bovw_feature_cert)
-
-            # @Jérôme: adjustment of the contrast
+                    cert_features[j] = output[0]
+                    cv2.imwrite(SAVE_PATH, img)
+                    data.append([j, SAVE_PATH, x, y, w, h])
             #pxmin = np.min(img)
             #pxmax = np.max(img)
             #imgContrast = (img - pxmin) / (pxmax - pxmin) * 255
@@ -123,12 +125,24 @@ if __name__ == '__main__':
             #
 
             #txt = pytesseract.image_to_string(img)
+        df_data = pd.DataFrame(data, columns = ["index","abs_path",
+                                                "x", "y", "w", "h"])
+        X_cert = []
+        index_X_cert = []
 
-            # save image
-            if not desc is None:
-                SAVE_PATH = os.path.join(LOT_PATH + ''%d_%d_img.png' %(x,y))
-                cv2.imwrite(SAVE_PATH, img)
+        for key, features in cert_features.items():
+            bovw_feature_cert = find_cluster(kmeans, features)
+            X_cert.append(bovw_feature_cert)
+            index_X_cert.append(key)
 
+        y_pred_cert = clf_lr.predict(np.array(X_cert))
+
+        df_pred = pd.DataFrame(list(zip(index_X_cert, y_pred_cert)),
+                               columns = "index","y_pred" )
+
+        df_merge = df_data.merge(df_pred, on="index").set_index("index")
+        df_merge.to_csv(os.path.join(OUTPUT_PATH, '%s_df.csv' %filename.split(".")[0]))
+        # I should probably add a dataframe
         if bool(args.plot):
             fig, ax = plt.subplots(figsize=(6,10))
             ax.imshow(mat_img, cmap='gray')
