@@ -12,6 +12,7 @@ import editdistance
 import pdb
 from unidecode import unidecode
 from pdf2image import convert_from_path
+from config import DIR_PATH
 
 def extract_name(filename):
     """
@@ -775,15 +776,19 @@ def feature_engineering(img, step=32, radius=32, histograms=8, orientations=8,
     return output
 
 def image_preprocessing(img):
-    # crop white space
-    #im = trim(img)
+    mat_img = np.array(img)
+
+    # increase contrast
+    pxmin = np.min(mat_img)
+    pxmax = np.max(mat_img)
+    mat_img = ((mat_img - pxmin) / (pxmax - pxmin) * 255).astype(np.uint8)
+    #kernel = np.ones((3, 3), np.uint8)
+    #mat_img = cv2.erode(mat_img, kernel, iterations = 1)
+    #img2 = mat_img.copy()
+    #img2, img = thresholding(img, img, DIR_PATH, option = 1)
     mat_img = np.asarray(img)
+
     # get rid of salt and pepper noise
-    # convert to gray scale as only the luminosity is important
+    mat_img = cv2.medianBlur(mat_img, 3)
 
-    # denoise
-    mat_img_filter = filters.median(mat_img)
-
-    # contast adjustment
-
-    return mat_img_filter
+    return mat_img
