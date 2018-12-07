@@ -51,7 +51,7 @@ if __name__ == '__main__':
         kmeans = load(os.path.join(MODEL_PATH,'kmeans.joblib'))
         clf = load(os.path.join(MODEL_PATH,'clf_lr.joblib'))
 
-        with open(os.path.join(DIR_PATH, 'retained_file_score_1'), 'rb') as fp:
+        with open(os.path.join(DIR_PATH, 'retained_file_score_3'), 'rb') as fp:
             file_list_crnn = pickle.load(fp)
 
     sorted_file_list_crnn = sorted(file_list_crnn)
@@ -86,8 +86,8 @@ if __name__ == '__main__':
         if bool(args.obs):
             bb_tuple = wordSegmentation(mat_img)
         else:
-            bb_tuple = wordSegmentation(mat_img, minArea=200,  kernelSize=71,
-                                    sigma=211, theta = 11)
+            bb_tuple = wordSegmentation(mat_img, minArea=200,  kernelSize=51,
+                                        sigma=211, theta = 11)
 
         # remove folder where images are stored
         #shutil.rmtree(IMG_PATH)

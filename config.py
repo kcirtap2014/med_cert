@@ -3,7 +3,7 @@
 import os
 import pandas as pd
 
-DIR_PATH = os.getcwd()
+DIR_PATH = '/Users/pmlee/Documents/FRP/Cert_Recognition/Cert_Recognition'#os.getcwd()
 
 # load certificates
 CERT_PATH= os.path.join(DIR_PATH, 'TestCertificats')

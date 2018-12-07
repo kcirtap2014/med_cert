@@ -776,16 +776,15 @@ def feature_engineering(img, step=32, radius=32, histograms=8, orientations=8,
     return output
 
 def image_preprocessing(img):
-    mat_img = np.array(img)
 
     # increase contrast
-    pxmin = np.min(mat_img)
-    pxmax = np.max(mat_img)
-    mat_img = ((mat_img - pxmin) / (pxmax - pxmin) * 255).astype(np.uint8)
-    #kernel = np.ones((3, 3), np.uint8)
-    #mat_img = cv2.erode(mat_img, kernel, iterations = 1)
-    #img2 = mat_img.copy()
-    #img2, img = thresholding(img, img, DIR_PATH, option = 1)
+    pxmin = np.min(img)
+    pxmax = np.max(img)
+    img = ((img - pxmin) / (pxmax - pxmin) * 255).astype(np.uint8)
+    kernel = np.ones((3, 3), np.uint8)
+    img = cv2.erode(img, kernel, iterations = 1)
+    img2 = img.copy()
+    img2, img = thresholding(img, img, DIR_PATH, option = 1)
     mat_img = np.asarray(img)
 
     # get rid of salt and pepper noise
