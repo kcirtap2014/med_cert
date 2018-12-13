@@ -1,175 +1,330 @@
-import shutil
-import pickle
-import os
-import pandas as pd
 import numpy as np
-import pytesseract
-from PIL import Image
-from pdf2image import convert_from_path
-from skimage.filters import threshold_otsu
-from helper_functions import (local_thresholding, wordSegmentation,
-                              trim, thresholding, rotation, feature_engineering,
-                              find_cluster, image_preprocessing)
-
-import argparse
+import pandas as pd
 import cv2
+import os
+import pickle
 import pdb
-from joblib import load
-from collections import defaultdict
-from config import DIR_PATH, MODEL_PATH, CERT_PATH, OBS_PATH, PDF_PATH, OUTPUT_PATH
-from copy import copy
+import matplotlib.patches as patches
+from PIL import Image
+from itertools import groupby
+from pdf2image import convert_from_path
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--plot", help="Activate plot",type=bool, nargs='?',
-                    const=True, default=False)
-parser.add_argument("--obs", help="obs data",type=bool, nargs='?',
-                    const=True, default=False)
-args = parser.parse_args()
+from helper_functions import (len_iter, consecutive_key,
+                              detect_peaks, horizontal_clustering)
 
-# run by typing python3 segmentation.py
-if __name__ == '__main__':
-
-    if bool(args.plot):
-        import matplotlib.pylab as plt
-        import matplotlib.patches as patches
-
-    if bool(args.obs):
-        INPUT_PATH = os.path.join(OBS_PATH, 'input')
-        IMG_PATH = os.path.join(OBS_PATH,  'words')
-
-        if os.path.exists(IMG_PATH):
-            shutil.rmtree(IMG_PATH)
-
-        # check if fig_path exists
-        os.makedirs(IMG_PATH)
-
-        file_list_crnn = os.listdir(INPUT_PATH)
-
-    else:
-        INPUT_PATH = os.path.join(DIR_PATH, 'input')
-        IMG_PATH = os.path.join(DIR_PATH,'img_data')
-        kmeans = load(os.path.join(MODEL_PATH,'kmeans.joblib'))
-        clf = load(os.path.join(MODEL_PATH,'clf_lr.joblib'))
-
-        with open(os.path.join(DIR_PATH, 'retained_file_score_3'), 'rb') as fp:
-            file_list_crnn = pickle.load(fp)
-
-    sorted_file_list_crnn = sorted(file_list_crnn)
-
-    for i, file in enumerate(sorted_file_list_crnn):
-        filename = os.fsdecode(file)
-        if bool(args.obs):
-            src = os.path.join(INPUT_PATH, filename)
-        else:
-            src = os.path.join(CERT_PATH, filename)
-        print("%d:%s"%(i,filename))
-
-        if filename.endswith(".pdf"):
-            # convert it to gray scale
-            img = convert_from_path(src, fmt="png", dpi=200)[0].convert('L')
-
-        else:
-            #src_pdf = PDF_PATH + filename.split('.')[0] + ".pdf"
-            # convert it to gray scale
-            im_temp = Image.open(src).convert('L')
-
-            img = rotation(im_temp)
-            #im_temp.save(src_pdf, "pdf", optimize=True, quality=85)
-            #img = convert_from_path(src_pdf, fmt="png")[0].convert('L')
-
-        cropped_img = trim(img)
-        #invert = cv2.bitwise_not(cropped_img)
-        mat_img = np.asarray(cropped_img)
-
-        #invert = cv2.bitwise_not(mat_img)
-        #mat_img = thresholding(invert, option=0)
-        if bool(args.obs):
-            bb_tuple = wordSegmentation(mat_img)
-        else:
-            bb_tuple = wordSegmentation(mat_img, minArea=200,  kernelSize=51,
-                                        sigma=211, theta = 11)
-
-        # remove folder where images are stored
-        #shutil.rmtree(IMG_PATH)
-        #os.makedirs(IMG_PATH)
+class Segmentation:
+    def __init__(image, morph_close_kernel = (2,2), Th = 3.5, connectivity = 8
+                aTl = 10, aTo = 0.4):
+        self.image = np.array(image)
+        self.morph_close_kernel = np.ones(morph_close_kernel,np.uint8)
+        self.Th = Th
+        self.connectivity = connectivity
+        self.aTl = aTl
+        self.aTo = aTo
 
 
-        if bool(args.obs):
-            LOT_PATH  = os.path.join(IMG_PATH, 'lot%d' %i)
+    def filter_stats_CC(self, stats, l_filter=True):
+        """
+        Establishing connected components based on Zagoris' parameters
 
-        else:
-            LOT_PATH = os.path.join(IMG_PATH, filename.split('.')[0])
+        Parameters:
+        -----------
+        stats: cv2.CC_STAT object
+            arrays of (x,y,w,h)
 
-        if os.path.exists(LOT_PATH):
-            shutil.rmtree(LOT_PATH)
+        l_filter: boolean
+            True if performing filtering to establish connected components
 
-        os.makedirs(LOT_PATH)
+        Returns:
+        --------
+        bboxes: numpy ndarray
+            contains arrays of (x,y,w,h)
 
-        data = []
-        cert_features = defaultdict()
+        """
 
-        if bool(args.plot):
-            rects = []
+        bboxes = []
+        himg, wimg = self.image.shape
 
-        for j, tup in enumerate(bb_tuple):
-            x, y, w, h = tup[0]
+        for i, col in enumerate(stats):
+            x = col[0]  #cv2.CC_STAT_LEFT(column)
+            y = col[1]  #cv2.CC_STAT_TOP(column)
+            w = col[2]  #cv2.CC_STAT_WIDTH(column)
+            h = col[3]  #cv2.CC_STAT_HEIGHT(column)
 
-            if bool(args.plot):
-                rect = patches.Rectangle((x,y),w,h,linewidth=1, edgecolor='r',
-                                     facecolor='none')
-                rects.append(rect)
-            img = tup[1]
-            #img = Image.fromarray(tup[1])
-            SAVE_PATH = os.path.join(LOT_PATH, '%d_%d_img.png' %(y,x))
+            fn = len(np.where(self.image[y:y + h, x:x + w] == 0)[1])
+            #print( h[i],w[i], h[i],w[i])
+            e = np.min([h, w]) / np.max([h, w])
+            d = fn / (h * w)
 
-            mat_img = image_preprocessing(img)
-
-            if bool(args.obs):
-                cv2.imwrite(SAVE_PATH, mat_img)
-
+            # 3 criteria in filtering + 1 parameter to avoid taking oversized
+            # connected components
+            if l_filter:
+                if not (np.logical_or.reduce([
+                        h < 5, w < 5, d < 0.05, d > 0.9, e < 0.08, w >= 0.8 * wimg,
+                        h >= 0.8 * himg
+                ])):
+                    bboxes.append([x, y, w, h])
             else:
-                # increase line width
-                #kernel = np.ones((3, 3), np.uint8)
-                #mat_img = cv2.erode(mat_img, kernel, iterations = 1)
-                output = feature_engineering(mat_img, l_daisy=False, l_hog=False)
+                # do not take boxes that occupy the height of the page
+                if not h >= 0.8 * himg:
+                    bboxes.append([x, y, w, h])
 
-                if not output[0] is None:
-                    cert_features[j] = output[0]
-                    cv2.imwrite(SAVE_PATH, mat_img)
-                    data.append([j, SAVE_PATH, x, y, w, h])
+        return bboxes
 
-            #txt = pytesseract.image_to_string(img)
-        if not bool(args.obs):
-            df_data = pd.DataFrame(data, columns = ["index","abs_path",
-                                                    "x", "y", "w", "h"])
+    def arlsa(self, img, components, groups):
+        """
+        Adaptive Run Line Smoothing Algorithm
 
-            # indexation of the segments
-            num_bins = np.ceil((df_data.y.max() - df_data.y.min())/df_data.h.median())
-            bins = np.linspace(df_data.y.min(), df_data.y.max(),
-                               num = num_bins, endpoint=True)
-            df_data.loc[:, 'y_grouped'] = pd.cut(df_data.y, bins = bins,
-                                            include_lowest = True)
-            X_cert = []
-            index_X_cert = []
+        Parameters:
+        -----------
+        components: numpy ndarray
+            arrays of (x,y,w,h)
 
-            for key, features in cert_features.items():
-                bovw_feature_cert = find_cluster(kmeans, features)
-                X_cert.append(bovw_feature_cert)
-                index_X_cert.append(key)
+        groups: defaultdict
+            dict of grouped components
 
-            y_pred_cert = clf.predict(np.array(X_cert))
+        Returns:
+        --------
+        img_copy: numpy ndarray
+            image generated after checking on within components
 
-            df_pred = pd.DataFrame(list(zip(index_X_cert, y_pred_cert)),
-                                   columns = ["index", "y_pred"] )
-            df_merge = df_data.merge(df_pred, on="index").set_index("index")
-            sorted_df_merge = df_merge.sort_values(by=['y_grouped', 'x'])
-            sorted_df_merge.to_csv(os.path.join(OUTPUT_PATH,
-                                    '%s_df.csv' %filename.split(".")[0]))
-        # I should probably add a dataframe
-        if bool(args.plot):
-            fig, ax = plt.subplots(figsize=(6,10))
-            ax.imshow(mat_img, cmap='gray')
+        img_copy_copy: numpy ndarray
+            image generated after checking on between components
+        """
 
-            for rect in rects:
-                ax.add_patch(rect)
-            plt.show()
+        self.Th = 3.5
+        img_copy = img.copy()
+
+        # within the component, just perform binary output function
+        for i, (x, y, w, h) in enumerate(components):
+            img_copy[y:y+h, x:x+w] = 0
+
+        img_copy_copy = img_copy.copy()
+        # between components
+
+        for g, q in groups.items():
+            sub_components = sorted(np.array(components)[q], key = lambda x: x[0])
+            len_comp = len(sub_components)
+
+            if len_comp>=2:
+                # compare with direct neighbour
+                for i in range(len_comp -1):
+                    (xi, yi, wi, hi) = sub_components[i]
+                    (xj, yj, wj, hj) = sub_components[i+1]
+
+                    if xi<=xj:
+                        Tl = self.aTl * np.max([wi, wj])
+                        To = self.aTo * np.min([hi, hj])
+
+                        xmin = xi#np.min([xi,xj])
+                        xmax = np.max([xi+wi,xj+wj])
+                        ymin = np.min([yi,yj])
+                        ymax = np.min([yi+hi,yj+hj])
+
+                        #L = len(np.max(img_copy[ymin:ymax, xmin:xmax], axis=0))
+                        #L = np.where(img_copy[ymin:ymax, xmin:xmax]==255)[0].size
+                        L = np.min([wi,wj]
+                        H = np.max([hi, hj]) / np.min([hi, hj])
+
+                        # metric to determine how much it is overlapped, it's positive if it's overlapped
+                        O = np.min([yi + hi, yj + hj]) - np.max([yi, yj])
+
+                        if np.logical_and.reduce([L <= Tl, H <= self.Th, O >= To]):
+                            img_copy_copy[ymin:ymax,xmin:xmax] = 0
+
+        return img_copy, img_copy_copy
+
+    def word_segmentation(self, img, components):
+        """
+        text block segmentation
+        Estimation of the threshold that seprates the intra-word distance and
+        inter-word distance between two clusters by minimizing the intra-class
+        variance between them as in Otsu approach
+
+        Parameters:
+        -----------
+        components: numpy ndarray
+            components after adaptive RLSA, text lines are established
+
+        Returns:
+        --------
+        new_components: numpy ndarray
+            arrays of (x,y,w,h) that represent words
+        """
+        # h, w = components.shape
+
+        new_components = []
+
+        for i, (x, y, w, h) in enumerate(components):
+            count = np.argmin(img[y:y + h, x:x + w], axis=0)
+            consec_zeros = consecutive_zeros(count)
+            start, end = otsu_hist(consec_zeros)
+
+            if start is not None and end is not None:
+                # include offset
+                start += x
+                end += x
+                start = np.append(start, x+w)
+                end = np.insert(end, 0, x)
+
+                for j in range(len(start)):
+                    new_w = start[j] - end[j]
+                    new_y = y
+                    new_x = end[j]
+                    new_h = h
+                    new_components.append([new_x, new_y, new_w, new_h])
+            else:
+                # already in a word segment
+                new_components.append([x, y, w, h])
+
+        return new_components
+
+
+    def otsu_hist(self, hist_list):
+        """
+        thresholding using otsu method to divide the text line block to word
+        blocks
+
+        Parameters:
+        -----------
+        hist_list: numpy ndarray
+            arrays of [begin, count], with begin the index where the consecutive
+            key begins and count the number of consecutive keys
+
+        Returns:
+        --------
+        start: array
+            an array of starting index of the consecutive key
+
+        end: array
+            an array of ending index of the consecutive key
+        """
+
+        begin = [v[0] for v in hist_list]
+        count = [v[1] for v in hist_list]
+        hist = np.zeros(np.max(count) + 1)
+
+        for v in count:
+            hist[v] += 1
+
+        sigma_b = np.zeros(len(hist))
+        total = np.sum(hist)
+        i_hist = np.arange(len(hist)) * hist
+
+        for k in range(len(hist)):
+            w0 = np.sum(hist[:k])
+            w1 = total - w0
+
+            if (w0 == 0 or w1 == 0):
+                # to avoid division by 0
+                continue
+
+            mu0 = np.sum(i_hist[:k]) / w0
+            mu1 = np.sum(i_hist[k:]) / w1
+            sigma_b[k] = w0 * w1 * (mu0 - mu1)**2
+
+        key = np.argmax(sigma_b)
+
+        if key > 0:
+            ind = np.where(count > key)
+            start = np.array(begin)[ind]
+            end = start + np.array(count)[ind] - 1
+
+        else:
+            start = None
+            end = None
+
+        return start, end
+
+    def hough_line_transform(self, img):
+        """
+        Hough line transformation to get rid of lines. Only horizontal lines are
+        taken out.
+        """
+
+        edges = cv2.Canny(img, 50, 150, apertureSize = 3)
+        minLineLength = 100
+        maxLineGap = 30
+
+        lines = cv2.HoughLines(edges, 1, np.pi/2, 250)
+        # image – 8-bit, lines, rho, theta, threshold, minLineLength, maxLineGap
+        # draw mask
+        n_arb_reconstruct = np.max(list(img.shape))
+
+        if lines is not None:
+            for line in lines:
+                rho, theta = line[0]
+                a = np.cos(theta)
+                b = np.sin(theta)
+                x0 = a*rho
+                y0 = b*rho
+                x1 = int(x0 + n_arb_reconstruct*(-b))
+                #y1 = int(y0 + n_arb_reconstruct*(a))
+                x2 = int(x0 - n_arb_reconstruct*(-b))
+                #y2 = int(y0 - n_arb_reconstruct*(a))
+                # only get rid of horizontal lines
+                y1 = y0
+                y2 = y0
+
+                # Draw a black lines with thickness of 5 px
+                cv2.line(img, (x1,y1), (x2,y2), (255, 255, 255), 2)
+
+        return img
+
+    def run(verbose=False):
+        """
+        run segmentation routine
+        """
+        # Step 1: Evaluate peaks for thresholding
+        n, _ = np.histogram(self.images.ravel(), bins=256)
+        img = self.images.copy()
+        peakInd = detect_peaks(n, mpd = 10)
+        # take only the first two highest peaks to test for comparison
+        # add in the last peak that is undetectable by this algo
+        # print(list(peakInd)+[255])
+        peaks = sorted(n[list(peakInd)+[255]], reverse=True)[:2]
+
+        if peaks[0]<10*peaks[1]: # or not peak_max==255:
+            # peak_max==255 takes care of cases with heavy shadow
+            # use adaptive when peaks are of the same order of magnitude
+            if verbose:
+                print(peaks, 'Use adaptive_thresholding')
+
+            img = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                        cv2.THRESH_BINARY, 19, 20)
+        else:
+            if verbose:
+                print(peaks, 'Use otsu_thresholding')
+            # use otsu when there is no distinctive amplitude (1 order of magnitude difference at least)
+            blur = cv2.GaussianBlur(img, (9,9), 0)
+            ret, img = cv2.threshold(blur, 0, 255,
+                                        cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+            if verbose:
+                print("Otsu threshold:%d" %ret)
+
+        # Step 2: Graphical line removal
+        img = self.hough_line_transform(img)
+
+        # Step 3: Morphological closing
+        img = cv2.morphologyEx(cv2.bitwise_not(img), cv2.MORPH_CLOSE,
+                               self.morph_close_kernel)
+
+        # Step 4: Median blur
+        img = cv2.medianBlur(cv2.bitwise_not(img), 5)
+
+        # Step 5: Connected components
+        n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(cv2.bitwise_not(img),
+         self.connectivity, cv2.CV_32S)
+        bboxes = filter_stats_CC(img, stats)
+
+        # Step 6: ARLSA
+        groups = horizontal_clustering(bboxes)
+        img_w, img_b= self.arlsa(img, bboxes, groups)
+        n_labels_arlsa, labels_arlsa, stats_arlsa, centroids_arlsa = cv2.connectedComponentsWithStats(cv2.bitwise_not(img_b), self.connectivity, cv2.CV_32S)
+        bboxes_arlsa = filter_stats_CC(img_b, stats_arlsa, l_filter=False)
+
+        # Step 7: Text block segmentation
+        new_components = self.word_segmentation(img_b, bboxes_arlsa)
+
+        return new_components
