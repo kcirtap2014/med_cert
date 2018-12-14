@@ -12,8 +12,7 @@ import pickle #No longer used?
 import cv2 as cv
 from copy import copy
 import pdb
-from helper_functions import thresholding
-from config import DIR_PATH, df_exp, ext, file_list, C_KEYWORDS, BEGIN_DATE
+from config import DIR_PATH, df_exp, ext, file_list, C_KEYWORDS, BEGIN_DATE, PDF_PATH
 
 #### To use directly in python , set working directory to contain helper_functions.py and the directory containing certificates
 #### os.chdir("Desktop/Certificats/Cert_Recognition/")
@@ -21,7 +20,7 @@ from config import DIR_PATH, df_exp, ext, file_list, C_KEYWORDS, BEGIN_DATE
 ### To use pytesseract after standard windows installation:
 ### pytesseract.pytesseract.tesseract_cmd='C:/Program Files (x86)/Tesseract-OCR/tesseract'
 
-from helper_functions import rotation, text_preprocess, trim, keyword_lookup
+from helper_functions import (rotation, text_preprocess, trim, keyword_lookup, thresholding)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 sns.set_style("ticks")
@@ -34,10 +33,7 @@ if __name__ == '__main__':
     verbose  = bool(args.verbose)
 
     # some flags
-    dir_pdf_path = DIR_PATH + "/pdf/"
-
-    # load certificates
-    cert_dir = DIR_PATH + '/TestCertificats/'
+    PDF_PATH = DIR_PATH + "/pdf/"
 
     #keywords_preprocessed = []
     # sort by alphabetical order
@@ -45,11 +41,11 @@ if __name__ == '__main__':
 
     for i, file in enumerate(sorted_file_list):
         filename = os.fsdecode(file)
-        src = os.path.join(str(cert_dir), filename)
+        src = os.path.join(str(CERT_PATH), filename)
         print("%d:%s"%(i,filename))
 
         if not filename.endswith(".pdf"):
-            src_pdf = dir_pdf_path + filename.split('.')[0] + ".pdf"
+            src_pdf = PDF_PATH + filename.split('.')[0] + ".pdf"
 
             if not os.path.isfile(src_pdf):
                 # convert other ext files to pdf if not found in DIR_PATH_pdf
@@ -103,7 +99,7 @@ if __name__ == '__main__':
         print(df_exp)
         # Removing temporary pdf file
     try:
-        os.remove(DIR_PATH+"/temp.pdf")
+        os.remove(DIR_PATH + "/temp.pdf")
     except:
         pass
 
