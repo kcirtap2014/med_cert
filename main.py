@@ -67,9 +67,8 @@ if __name__ == '__main__':
         option = 0
         img2 = copy(img)
         score_total = pd.DataFrame(data=[[0,0,0,0]], 
-                                   columns=["C_Nom","C_Prenom",
-                                            "C_Date","C_Mention"],
-                                            index = [i])
+                                   columns=df_exp.columns.tolist()[5:9],
+                                   index = [i])
         
         # Attempting to read text from images with various processing options
         while((score_total.sum(axis=1).values != 4) and (option < 6)):
