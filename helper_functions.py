@@ -14,6 +14,7 @@ from unidecode import unidecode
 from pdf2image import convert_from_path
 from itertools import groupby
 from config import DIR_PATH
+from collections import defaultdict
 
 def extract_name(filename):
     """
@@ -1010,7 +1011,7 @@ def horizontal_clustering(components):
         groups[group].append(i)
 
     return groups
-    
+
 def image_preprocessing(img):
 
     # increase contrast

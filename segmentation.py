@@ -1,19 +1,13 @@
 import numpy as np
-import pandas as pd
 import cv2
-import os
-import pickle
-import pdb
 import matplotlib.patches as patches
 from PIL import Image
-from itertools import groupby
-from pdf2image import convert_from_path
-
-from helper_functions import (len_iter, consecutive_key,
-                              detect_peaks, horizontal_clustering)
+from helper_functions import (consecutive_key, horizontal_clustering)
+import Thresholding
 
 class Segmentation:
-    def __init__(image, morph_close_kernel = (2,2), Th = 3.5, connectivity = 8
+    def __init__(self, image, morph_close_kernel = (2,2), Th = 3.5,
+                connectivity = 8,
                 aTl = 10, aTo = 0.4):
         self.image = np.array(image)
         self.morph_close_kernel = np.ones(morph_close_kernel,np.uint8)
@@ -123,7 +117,7 @@ class Segmentation:
 
                         #L = len(np.max(img_copy[ymin:ymax, xmin:xmax], axis=0))
                         #L = np.where(img_copy[ymin:ymax, xmin:xmax]==255)[0].size
-                        L = np.min([wi,wj]
+                        L = np.min([wi,wj])
                         H = np.max([hi, hj]) / np.min([hi, hj])
 
                         # metric to determine how much it is overlapped, it's positive if it's overlapped
@@ -157,8 +151,8 @@ class Segmentation:
 
         for i, (x, y, w, h) in enumerate(components):
             count = np.argmin(img[y:y + h, x:x + w], axis=0)
-            consec_zeros = consecutive_zeros(count)
-            start, end = otsu_hist(consec_zeros)
+            consec_zeros = consecutive_key(count)
+            start, end = self.otsu_hist(consec_zeros)
 
             if start is not None and end is not None:
                 # include offset
@@ -243,8 +237,8 @@ class Segmentation:
         """
 
         edges = cv2.Canny(img, 50, 150, apertureSize = 3)
-        minLineLength = 100
-        maxLineGap = 30
+        #minLineLength = 100
+        #maxLineGap = 30
 
         lines = cv2.HoughLines(edges, 1, np.pi/2, 250)
         # image – 8-bit, lines, rho, theta, threshold, minLineLength, maxLineGap
@@ -271,37 +265,14 @@ class Segmentation:
 
         return img
 
-    def run(verbose=False):
+    def run(self, verbose=False):
         """
         run segmentation routine
         """
-        # Step 1: Evaluate peaks for thresholding
-        n, _ = np.histogram(self.images.ravel(), bins=256)
-        img = self.images.copy()
-        peakInd = detect_peaks(n, mpd = 10)
-        # take only the first two highest peaks to test for comparison
-        # add in the last peak that is undetectable by this algo
-        # print(list(peakInd)+[255])
-        peaks = sorted(n[list(peakInd)+[255]], reverse=True)[:2]
-
-        if peaks[0]<10*peaks[1]: # or not peak_max==255:
-            # peak_max==255 takes care of cases with heavy shadow
-            # use adaptive when peaks are of the same order of magnitude
-            if verbose:
-                print(peaks, 'Use adaptive_thresholding')
-
-            img = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                        cv2.THRESH_BINARY, 19, 20)
-        else:
-            if verbose:
-                print(peaks, 'Use otsu_thresholding')
-            # use otsu when there is no distinctive amplitude (1 order of magnitude difference at least)
-            blur = cv2.GaussianBlur(img, (9,9), 0)
-            ret, img = cv2.threshold(blur, 0, 255,
-                                        cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-            if verbose:
-                print("Otsu threshold:%d" %ret)
+        img_thresh = Thresholding(self.image)
+        # Step 1: Evaluate peaks for thresholding and thresholding
+        img_thresh.run(verbose=True)
+        img = img_thresh.image.copy()
 
         # Step 2: Graphical line removal
         img = self.hough_line_transform(img)
@@ -316,13 +287,13 @@ class Segmentation:
         # Step 5: Connected components
         n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(cv2.bitwise_not(img),
          self.connectivity, cv2.CV_32S)
-        bboxes = filter_stats_CC(img, stats)
+        bboxes = self.filter_stats_CC(img, stats)
 
         # Step 6: ARLSA
         groups = horizontal_clustering(bboxes)
         img_w, img_b= self.arlsa(img, bboxes, groups)
         n_labels_arlsa, labels_arlsa, stats_arlsa, centroids_arlsa = cv2.connectedComponentsWithStats(cv2.bitwise_not(img_b), self.connectivity, cv2.CV_32S)
-        bboxes_arlsa = filter_stats_CC(img_b, stats_arlsa, l_filter=False)
+        bboxes_arlsa = self.filter_stats_CC(img_b, stats_arlsa, l_filter=False)
 
         # Step 7: Text block segmentation
         new_components = self.word_segmentation(img_b, bboxes_arlsa)
