@@ -172,6 +172,12 @@ def find_partial(w, txt, n_keep_char):
 
 def thresholding(img, img2, DIR_PATH, option = 0):
 
+    if option == 0:
+        im = trim(img)
+        mat_img = np.asarray(im)
+        im = cv2.medianBlur(mat_img, 3)
+        img2 = Image.fromarray(im)
+   
     if option == 1:
         IMG0 = np.array(img)
         thresh = cv2.adaptiveThreshold(IMG0,255,
