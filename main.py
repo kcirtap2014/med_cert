@@ -73,7 +73,6 @@ if __name__ == '__main__':
         
         # Attempting to read text from images with various processing options
         while((score_total.sum(axis=1).values != 4) and (option < 6)):
-            
             img, img2 = thresholding(img, img2, DIR_PATH, option)
             im = trim(img2)
             txt_img = pytesseract.image_to_string(im)

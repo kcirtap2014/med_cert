@@ -6,5 +6,5 @@ TestCertificats/*
 retained*
 README
 fig/*
-config.py
 fig_new/*
+main_prodution.py
