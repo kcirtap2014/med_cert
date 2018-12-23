@@ -50,7 +50,7 @@ class FileHandling():
 
     def delete(self):
         """
-        delete row from database
+        delete row and get rid of duplicates from database
         """
         index_touched =  self.touched[self.touched].index
         self.df = self.df.loc[index_touched]
