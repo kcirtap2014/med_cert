@@ -68,23 +68,26 @@ if __name__ == '__main__':
         score_total = pd.DataFrame(data=[[0,0,0,0]],
                                    columns=df_exp.columns.tolist()[5:9],
                                    index = [i])
-        im_proc = ImagePreprocessing(img, verbose=verbose, graph_line=False, morphology=False)
-        im_proc.process()
-        txt_img = pytesseract.image_to_string(im_proc.image)
-        txt = text_preprocess(txt_img)
 
-        if verbose:
-            print("try ", option + 1,":", txt)
+        while((score_total.sum(axis=1).values != 4) and (option < 2)):
+            im_proc = ImagePreprocessing(img, verbose=verbose, graph_line=False,    morphology=False, option=option)
+            im_proc.process()
+            txt_img = pytesseract.image_to_string(im_proc.image)
+            txt = text_preprocess(txt_img)
 
-        temp = keyword_lookup(i, df_exp, filename, txt,
-                              BEGIN_DATE, C_KEYWORDS)
-        score = temp.iloc[:,5:9]*1
-        score_total += score
+            if verbose:
+                print("try ", option + 1,":", txt)
 
-        if verbose:
-            print(score_total)
+            temp = keyword_lookup(i, df_exp, filename, txt,
+                                  BEGIN_DATE, C_KEYWORDS)
+            score = temp.iloc[:,5:9]*1
+            score_total += score
 
-        score_total.replace(2, 1, inplace=True)
+            if verbose:
+                print(score_total)
+
+            score_total.replace(2, 1, inplace=True)
+            option += 1
         # Attempting to read text from images with various processing options
         if False:
             while((score_total.sum(axis=1).values != 4) and (option < 6)):
