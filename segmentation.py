@@ -3,21 +3,26 @@ import cv2
 import matplotlib.patches as patches
 from PIL import Image
 from helper_functions import (consecutive_key, horizontal_clustering)
-import Thresholding
+from thresholding import Thresholding
+from image_preprocessing import ImagePreprocessing
+import pdb
 
 class Segmentation:
     def __init__(self, image, morph_close_kernel = (2,2), Th = 3.5,
-                connectivity = 8,
-                aTl = 10, aTo = 0.4):
+                connectivity = 8, erode_kernel = (2,2),
+                dilate_kernel = (3,3),
+                aTl = 12, aTo = 0.4):
         self.image = np.array(image)
         self.morph_close_kernel = np.ones(morph_close_kernel,np.uint8)
+        self.erode_kernel = np.ones(erode_kernel,np.uint8)
+        self.dilate_kernel = np.ones(erode_kernel,np.uint8)
         self.Th = Th
         self.connectivity = connectivity
         self.aTl = aTl
         self.aTo = aTo
+        self.new_components_ = None
 
-
-    def filter_stats_CC(self, stats, l_filter=True):
+    def filter_stats_CC(self, img, stats, l_filter=True):
         """
         Establishing connected components based on Zagoris' parameters
 
@@ -37,7 +42,7 @@ class Segmentation:
         """
 
         bboxes = []
-        himg, wimg = self.image.shape
+        himg, wimg = img.shape
 
         for i, col in enumerate(stats):
             x = col[0]  #cv2.CC_STAT_LEFT(column)
@@ -45,7 +50,7 @@ class Segmentation:
             w = col[2]  #cv2.CC_STAT_WIDTH(column)
             h = col[3]  #cv2.CC_STAT_HEIGHT(column)
 
-            fn = len(np.where(self.image[y:y + h, x:x + w] == 0)[1])
+            fn = len(np.where(img[y:y + h, x:x + w] == 0)[1])
             #print( h[i],w[i], h[i],w[i])
             e = np.min([h, w]) / np.max([h, w])
             d = fn / (h * w)
@@ -53,6 +58,7 @@ class Segmentation:
             # 3 criteria in filtering + 1 parameter to avoid taking oversized
             # connected components
             if l_filter:
+
                 if not (np.logical_or.reduce([
                         h < 5, w < 5, d < 0.05, d > 0.9, e < 0.08, w >= 0.8 * wimg,
                         h >= 0.8 * himg
@@ -88,16 +94,21 @@ class Segmentation:
 
         self.Th = 3.5
         img_copy = img.copy()
+        a_hmin = 0.0
 
         # within the component, just perform binary output function
         for i, (x, y, w, h) in enumerate(components):
-            img_copy[y:y+h, x:x+w] = 0
+            hmin = (a_hmin*h).astype(int)
+
+            img_copy[y + hmin:y + h - hmin, x:x + w] = 0
 
         img_copy_copy = img_copy.copy()
         # between components
 
-        for g, q in groups.items():
+        for g, q  in groups.items():
+
             sub_components = sorted(np.array(components)[q], key = lambda x: x[0])
+
             len_comp = len(sub_components)
 
             if len_comp>=2:
@@ -110,25 +121,26 @@ class Segmentation:
                         Tl = self.aTl * np.max([wi, wj])
                         To = self.aTo * np.min([hi, hj])
 
-                        xmin = xi#np.min([xi,xj])
+                        xmin = np.min([xi,xj])
                         xmax = np.max([xi+wi,xj+wj])
                         ymin = np.min([yi,yj])
                         ymax = np.min([yi+hi,yj+hj])
-
+                        # hmin is used to color only 0.9 of total hmax in S
+                        hmin = (a_hmin*np.min([hi,hj])).astype(int)
+                        #pdb.set_trace()
                         #L = len(np.max(img_copy[ymin:ymax, xmin:xmax], axis=0))
                         #L = np.where(img_copy[ymin:ymax, xmin:xmax]==255)[0].size
                         L = np.min([wi,wj])
                         H = np.max([hi, hj]) / np.min([hi, hj])
-
                         # metric to determine how much it is overlapped, it's positive if it's overlapped
                         O = np.min([yi + hi, yj + hj]) - np.max([yi, yj])
 
                         if np.logical_and.reduce([L <= Tl, H <= self.Th, O >= To]):
-                            img_copy_copy[ymin:ymax,xmin:xmax] = 0
+                            img_copy_copy[ymin+hmin:ymax-hmin,xmin:xmax] = 0
 
         return img_copy, img_copy_copy
 
-    def word_segmentation(self, img, components):
+    def word_segmentation(self, img, components, axis=0):
         """
         text block segmentation
         Estimation of the threshold that seprates the intra-word distance and
@@ -137,8 +149,14 @@ class Segmentation:
 
         Parameters:
         -----------
+        img: numpy ndarray
+            image array
+
         components: numpy ndarray
             components after adaptive RLSA, text lines are established
+
+        axis: int
+            0 vertical projection, 1 horizontal projection. Default: 0
 
         Returns:
         --------
@@ -150,26 +168,46 @@ class Segmentation:
         new_components = []
 
         for i, (x, y, w, h) in enumerate(components):
-            count = np.argmin(img[y:y + h, x:x + w], axis=0)
-            consec_zeros = consecutive_key(count)
-            start, end = self.otsu_hist(consec_zeros)
+            count = np.argmin(img[y:y + h, x:x + w], axis=axis)
 
-            if start is not None and end is not None:
-                # include offset
-                start += x
-                end += x
-                start = np.append(start, x+w)
-                end = np.insert(end, 0, x)
+            if np.sum(count)>0:
+                # replace values less than 0.2*np.max(count) by 0
+                #count[count<np.median(count)] = 0
+                consec_zeros = consecutive_key(count, 0)
 
-                for j in range(len(start)):
-                    new_w = start[j] - end[j]
-                    new_y = y
-                    new_x = end[j]
-                    new_h = h
-                    new_components.append([new_x, new_y, new_w, new_h])
-            else:
-                # already in a word segment
-                new_components.append([x, y, w, h])
+                if not len(consec_zeros) == 0:
+                    start, end = self.otsu_hist(consec_zeros)
+
+                    if start is not None and end is not None:
+                        # include offset
+                        if axis==0:
+                            start += x
+                            end += x
+                            start = np.append(start, x+w)
+                            end = np.insert(end, 0, x)
+
+                        elif axis==1:
+                            start += y
+                            end += y
+                            start = np.append(start, y+h)
+                            end = np.insert(end, 0, y)
+
+                        for j in range(len(start)):
+                            if axis==0:
+                                new_w = start[j] - end[j]
+                                new_y = y
+                                new_x = end[j]
+                                new_h = h
+
+                            elif axis==1:
+                                new_w = w
+                                new_y = start[j]
+                                new_x = x
+                                new_h = end[j]
+                            new_components.append([new_x, new_y, new_w, new_h])
+                    else:
+                        # already in a word segment
+                        new_components.append([x, y, w, h])
 
         return new_components
 
@@ -230,72 +268,40 @@ class Segmentation:
 
         return start, end
 
-    def hough_line_transform(self, img):
-        """
-        Hough line transformation to get rid of lines. Only horizontal lines are
-        taken out.
-        """
-
-        edges = cv2.Canny(img, 50, 150, apertureSize = 3)
-        #minLineLength = 100
-        #maxLineGap = 30
-
-        lines = cv2.HoughLines(edges, 1, np.pi/2, 250)
-        # image – 8-bit, lines, rho, theta, threshold, minLineLength, maxLineGap
-        # draw mask
-        n_arb_reconstruct = np.max(list(img.shape))
-
-        if lines is not None:
-            for line in lines:
-                rho, theta = line[0]
-                a = np.cos(theta)
-                b = np.sin(theta)
-                x0 = a*rho
-                y0 = b*rho
-                x1 = int(x0 + n_arb_reconstruct*(-b))
-                #y1 = int(y0 + n_arb_reconstruct*(a))
-                x2 = int(x0 - n_arb_reconstruct*(-b))
-                #y2 = int(y0 - n_arb_reconstruct*(a))
-                # only get rid of horizontal lines
-                y1 = y0
-                y2 = y0
-
-                # Draw a black lines with thickness of 5 px
-                cv2.line(img, (x1,y1), (x2,y2), (255, 255, 255), 2)
-
-        return img
-
     def run(self, verbose=False):
         """
         run segmentation routine
         """
-        img_thresh = Thresholding(self.image)
-        # Step 1: Evaluate peaks for thresholding and thresholding
-        img_thresh.run(verbose=True)
-        img = img_thresh.image.copy()
 
-        # Step 2: Graphical line removal
-        img = self.hough_line_transform(img)
+        img = self.image.copy()
 
-        # Step 3: Morphological closing
-        img = cv2.morphologyEx(cv2.bitwise_not(img), cv2.MORPH_CLOSE,
-                               self.morph_close_kernel)
+        imgproc = ImagePreprocessing(img, verbose=verbose)
+        imgproc.process()
+        # Morphological closing
+        #linek = np.zeros((11,11),dtype=np.uint8)
+        #linek[5,...]=1
+        #img = cv2.erode(img, self.erode_kernel)
+        #img = cv2.dilate(img, self.dilate_kernel)
+        #se = cv2.getStructuringElement(cv2.MORPH_ELLIPSE , (5,5))
 
-        # Step 4: Median blur
-        img = cv2.medianBlur(cv2.bitwise_not(img), 5)
+        #img = cv2.morphologyEx(cv2.bitwise_not(imgproc.image), cv2.MORPH_CLOSE,
+        #                       se, iterations=1)
 
-        # Step 5: Connected components
-        n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(cv2.bitwise_not(img),
+        # Step 3: Median blur
+        img = imgproc.image#cv2.medianBlur(cv2.bitwise_not(img), 5)
+        ##cv2.medianBlur(cv2.bitwise_not(img), 5)
+
+        # Step 4: Connected components
+        n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img,
          self.connectivity, cv2.CV_32S)
         bboxes = self.filter_stats_CC(img, stats)
 
-        # Step 6: ARLSA
+        # Step 5: ARLSA
         groups = horizontal_clustering(bboxes)
-        img_w, img_b= self.arlsa(img, bboxes, groups)
+        img_w, img_b = self.arlsa(img, bboxes, groups)
         n_labels_arlsa, labels_arlsa, stats_arlsa, centroids_arlsa = cv2.connectedComponentsWithStats(cv2.bitwise_not(img_b), self.connectivity, cv2.CV_32S)
-        bboxes_arlsa = self.filter_stats_CC(img_b, stats_arlsa, l_filter=False)
-
-        # Step 7: Text block segmentation
-        new_components = self.word_segmentation(img_b, bboxes_arlsa)
-
-        return new_components
+        self.bboxes_arlsa = self.filter_stats_CC(img_b, stats_arlsa, l_filter=False)
+        # Step 6: Text block segmentation
+        self.new_components_ = self.word_segmentation(img, self.bboxes_arlsa)
+        self.image = img
+        self.image_b = img_b

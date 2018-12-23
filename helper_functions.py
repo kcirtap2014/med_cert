@@ -123,7 +123,7 @@ def thresholding(img, img2, DIR_PATH, option = 0):
         mat_img = np.asarray(im)
         im = cv2.medianBlur(mat_img, 3)
         img2 = Image.fromarray(im)
-   
+
     if option == 1:
         IMG0 = np.array(img)
         thresh = cv2.adaptiveThreshold(IMG0,255,
@@ -401,19 +401,21 @@ def rotation(im):
 
     Parameters:
     -----------
-    im: PIL image
+    im: numpy array
 
     Return:
     -------
     resulting image
     """
 
-    height, width = np.shape(im)
+    height, width = im.shape
 
     if height < width:
-        im = im.rotate(-90, expand=True)
+        new_im = np.rot90(im, k=-1)
+    else:
+        new_im = im
 
-    return im
+    return new_im
 
 def create_ngram(txt, n=2):
     """
@@ -983,7 +985,7 @@ def _plot(x, mph, mpd, threshold, edge, valley, ax, ind):
         # plt.grid()
         plt.show()
 
-def horizontal_clustering(components):
+def horizontal_clustering(components, bin_limit=100):
     """
     group components by line
 
@@ -999,14 +1001,17 @@ def horizontal_clustering(components):
     """
 
     x, y, w, h = zip(*components)
-    num_bins = np.ceil((np.max(y) - np.min(y)) / np.median(h))
+    num_bins = np.min([np.ceil((np.max(y) - np.min(y)) / np.median(h)),
+                      bin_limit])
 
     if num_bins == 1:
         num_bins += 1
 
     bins = np.linspace(np.min(y), np.max(y), num=num_bins, endpoint=True)
+    # group by mean of the height
     cut_vals = pd.cut(
         y,
+        #np.ceil(np.array(y) + np.array(h)/2.),
         bins=bins,
         include_lowest=True,
         labels = np.arange(num_bins - 1).astype(int))
@@ -1018,19 +1023,54 @@ def horizontal_clustering(components):
 
     return groups
 
-def image_preprocessing(img):
+def hough_line_transform(img, minLineLength=100, maxLineGap=80,
+                         p_hough=False, linewidth=4):
+    """
+    Hough line transformation to get rid of lines. Only horizontal lines are
+    taken out.
+    """
 
-    # increase contrast
-    pxmin = np.min(img)
-    pxmax = np.max(img)
-    img = ((img - pxmin) / (pxmax - pxmin) * 255).astype(np.uint8)
-    kernel = np.ones((3, 3), np.uint8)
-    img = cv2.erode(img, kernel, iterations = 1)
-    img2 = img.copy()
-    img2, img = thresholding(img, img, DIR_PATH, option = 1)
-    mat_img = np.asarray(img)
+    edges = cv2.Canny(img, 50, 150, apertureSize = 3)
 
-    # get rid of salt and pepper noise
-    mat_img = cv2.medianBlur(mat_img, 3)
+    if p_hough:
+        lines = cv2.HoughLinesP( edges, 1, np.pi/180, 0,
+                                    minLineLength,
+                                    maxLineGap )
+    else:
+        lines = cv2.HoughLines(edges, 1, np.pi/180, 300)
+    # image – 8-bit, lines, rho, theta, threshold, minLineLength, maxLineGap
+    # draw mask
+    if not p_hough:
+        # take the width
+        n_arb_reconstruct = img.shape[1]
+    img_copy = img.copy()
+    
+    if lines is not None:
 
-    return mat_img
+        for line in lines:
+            if p_hough:
+                 x1,y1,x2,y2 = line[0]
+
+            else:
+                rho, theta = line[0]
+                a = np.cos(theta)
+                b = np.sin(theta)
+                x0 = a*rho
+                y0 = b*rho
+                x1 = int(x0 + n_arb_reconstruct*(-b))
+                y1 = int(y0 + n_arb_reconstruct*(a))
+                x2 = int(x0 - n_arb_reconstruct*(-b))
+                y2 = int(y0 - n_arb_reconstruct*(a))
+
+
+            # only eliminate horizontal lines
+            diffx = x2 - x1
+            diffy = y2 - y1
+
+            if not diffx==0:
+                if np.abs(diffy/diffx) < 1:
+
+                    cv2.line(img_copy, (x1,y1), (x2,y2), (255, 255, 255), linewidth,
+                             cv2.LINE_AA)
+
+    return img_copy

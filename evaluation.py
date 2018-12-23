@@ -5,7 +5,7 @@ import pickle
 import argparse
 import pdb
 import matplotlib.pylab as plt
-from config import dir_path
+from config import DIR_PATH
 
 
 sns.set_style('ticks')
@@ -16,13 +16,13 @@ parser.add_argument("--file", help="filename", nargs='?', default='/df.csv')
 args = parser.parse_args()
 
 if __name__ == '__main__':
-    fig_path = dir_path + "/fig_new"
+    fig_path = DIR_PATH + "/fig_new_18dec"
 
     # check if fig_path exists
     if not os.path.exists(fig_path):
         os.makedirs(fig_path)
 
-    df = pd.read_csv(dir_path + str(args.file))
+    df = pd.read_csv(DIR_PATH + str(args.file))
 
     keep_columns = ["C_Nom","C_Prenom","C_Date","C_Mention"]
     df["Score"] = df[keep_columns].sum(axis=1).values
@@ -40,13 +40,13 @@ if __name__ == '__main__':
         df_retained = df.iloc[idx_retained]
         file_list_crnn = df_retained.FileName.tolist()
 
-        with open(dir_path +'/retained_file_score_%d' %i, 'wb') as fp:
+        with open(DIR_PATH +'/retained_file_score_%d' %i, 'wb') as fp:
             pickle.dump(file_list_crnn, fp)
 
         print("Score %d:" %i)
         print(file_list_crnn)
     # To read the pickle file
-    # with open(dir_path +'/retained_file_score_3', 'rb') as fp:
+    # with open(DIR_PATH +'/retained_file_score_3', 'rb') as fp:
     #    list = pickle.load(fp)
     if bool(args.plot):
         fig, ax = plt.subplots(figsize=(4, 4))
