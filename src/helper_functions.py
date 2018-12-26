@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageChops
-from skimage.feature import daisy, hog
+from skimage.feature import (daisy, hog, canny)
 import re
 from sklearn.cluster import MiniBatchKMeans
 from skimage import filters
@@ -15,6 +15,8 @@ from pdf2image import convert_from_path
 from itertools import groupby
 from config import DIR_PATH
 from collections import defaultdict
+from skimage.transform import (hough_line, hough_line_peaks,
+                               probabilistic_hough_line)
 
 def extract_name(filename):
     """
@@ -1068,14 +1070,20 @@ def hough_line_transform(img, minLineLength=100, maxLineGap=80,
     taken out.
     """
 
-    edges = cv2.Canny(img, 50, 150, apertureSize = 3)
+    #edges = cv2.Canny(img, 50, 150, apertureSize = 3)
+    edges = canny(img, sigma=1.0)
 
     if p_hough:
-        lines = cv2.HoughLinesP( edges, 1, np.pi/30, 0,
-                                    minLineLength,
-                                    maxLineGap )
+        lines = probabilistic_hough_line(edges, threshold=10,
+                                        line_length=minLineLength,
+                                        line_gap=maxLineGap,
+                                        theta=np.pi/30)
+        #lines = cv2.HoughLinesP( edges, 1, np.pi/30, 0,
+        #                            minLineLength,
+        #                            maxLineGap )
     else:
-        lines = cv2.HoughLines(edges, 1, np.pi/45, 300)
+        #lines = cv2.HoughLines(edges, 1, np.pi/45, 300)
+        lines = hough_line(edges, theta=np.pi/45)
     # image – 8-bit, lines, rho, theta, threshold, minLineLength, maxLineGap
     # draw mask
     if not p_hough:
@@ -1087,18 +1095,29 @@ def hough_line_transform(img, minLineLength=100, maxLineGap=80,
 
         for line in lines:
             if p_hough:
-                 x1,y1,x2,y2 = line[0]
+                 #x1,y1,x2,y2 = line[0]
+                 p0,p1 = line
+                 x1 = p0[0]
+                 y1 = p0[1]
+                 x2 = p1[0]
+                 y2 = p1[1]
 
             else:
-                rho, theta = line[0]
-                a = np.cos(theta)
-                b = np.sin(theta)
-                x0 = a*rho
-                y0 = b*rho
-                x1 = int(x0 + n_arb_reconstruct*(-b))
-                y1 = int(y0 + n_arb_reconstruct*(a))
-                x2 = int(x0 - n_arb_reconstruct*(-b))
-                y2 = int(y0 - n_arb_reconstruct*(a))
+
+                _, theta, dist = zip(*hough_line_peaks(line[0], line[1], line[2])
+                x1 = 0
+                x2 = img_copy.shape[1]
+                y1 = (dist - x1 * np.cos(theta)) / np.sin(theta)
+                y2 = (dist - x2 * np.cos(theta)) / np.sin(theta)
+                #_ theta, n_arb_reconstruct = line[0]
+                #a = np.cos(theta)
+                #b = np.sin(theta)
+                #x0 = a*rho
+                #y0 = b*rho
+                #x1 = int(x0 + n_arb_reconstruct*(-b))
+                #y1 = int(y0 + n_arb_reconstruct*(a))
+                #x2 = int(x0 - n_arb_reconstruct*(-b))
+                #y2 = int(y0 - n_arb_reconstruct*(a))
 
 
             # only eliminate horizontal lines
@@ -1107,7 +1126,7 @@ def hough_line_transform(img, minLineLength=100, maxLineGap=80,
 
             if not diffx==0:
                 if np.abs(diffy/diffx) < 1:
-
+                    pdb.set_trace()
                     cv2.line(img_copy, (x1,y1), (x2,y2), (255, 255, 255), linewidth,
                              cv2.LINE_AA)
 
