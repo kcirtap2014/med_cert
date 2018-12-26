@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from skimage.transform import resize
-
+from PIL import Image
 
 class Resize:
 
@@ -21,7 +21,7 @@ class Resize:
         newSize = (max(min(wt, int(w / f)), 1), max(min(ht, int(h / f)), 1)) # scale according to f (result at least 1 and at most wt or ht)
         #img = rescale(img, newSize)
         img = resize(img, (wt,ht), anti_aliasing=True)
-        print(img.shape)
+        #img = np.uint8(img)
         #target = np.ones([ht, wt]) * 255
         #target[0:newSize[1], 0:newSize[0]] = img
 

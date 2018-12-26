@@ -1,5 +1,6 @@
 import pandas as pd
 import seaborn as sns
+import numpy as np
 import pytesseract
 import os
 import argparse
@@ -12,12 +13,12 @@ import pdb
 import matplotlib.pylab as plt
 from DataLoader import Batch
 from Model import Model, DecoderType
-from config import DIR_PATH, df_exp, file_list, C_KEYWORDS, BEGIN_DATE, PDF_PATH, CERT_PATH, MODEL_PATH,RETAINED_FILE_PATH
+from config import (DIR_PATH, df_exp, file_list, C_KEYWORDS, BEGIN_DATE,
+                    PDF_PATH, CERT_PATH, MODEL_PATH,RETAINED_FILE_PATH, A4_100DPI)
 from resize import Resize
 from segmentation import Segmentation
 from helper_functions import (text_preprocess, trim, keyword_lookup)
 from image_preprocessing import ImagePreprocessing
-from skimage.transform import resize
 #### To use directly in python , set working directory to contain helper_functions.py and the directory containing certificates
 #### os.chdir("Desktop/Certificats/Cert_Recognition/")
 
@@ -37,7 +38,7 @@ if __name__ == '__main__':
     # some flags
     char_acc_file = os.path.join(MODEL_PATH,'accuracy.txt')
     char_list= os.path.join(MODEL_PATH,'charList.txt')
-    retained_file_list = os.path.join(RETAINED_FILE_PATH,'retained_file_score_1')
+    retained_file_list = os.path.join(RETAINED_FILE_PATH,'retained_file_score_0')
     decoderType = DecoderType.WordBeamSearch
     #keywords_preprocessed = []
     # sort by alphabetical order
@@ -45,12 +46,14 @@ if __name__ == '__main__':
     with open(retained_file_list,'rb') as fp:
         sorted_file_list = pickle.load(fp)
 
+    m_resizer = Resize(A4_100DPI)
+
     # import model
     model = Model(open(char_list).read(), decoderType,
                        mustRestore=True)
     print(open(char_acc_file).read())
 
-    for i, file in enumerate(sorted_file_list[:1]):
+    for i, file in enumerate(sorted_file_list[1:2]):
         filename = os.fsdecode(file)
         src = os.path.join(CERT_PATH, filename)
         print("%d:%s"%(i,filename))
@@ -67,7 +70,11 @@ if __name__ == '__main__':
             img = convert_from_path(src_pdf, fmt="png")[0].convert('L')
         else:
             img = convert_from_path(src, fmt="png")[0].convert('L')
-
+        # resize image
+        print(np.shape(img))
+        img = m_resizer.transform(np.array(img))
+        print("after", img.shape)
+        pdb.set_trace()
         # Setting variables for the loop
         option = 0
         #img2 = copy(img)

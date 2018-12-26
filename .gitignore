@@ -7,4 +7,15 @@ retained*
 README
 fig/*
 fig_new/*
-main_prodution.py
+src/main_production.py
+src/main_htr.py
+src/main_prod.py
+src/logs
+src/DataLoader.py
+src/Model.py
+src/SamplePreprocessor.py
+src/config_old.py
+src/segmentation_m.py
+src/__pycache__
+src/TFWordBeamSearch.so
+src/.DS_Store
