@@ -17,6 +17,8 @@ from config import DIR_PATH
 from collections import defaultdict
 from skimage.transform import (hough_line, hough_line_peaks,
                                probabilistic_hough_line)
+from skimage import draw
+import matplotlib.pylab as plt
 
 def extract_name(filename):
     """
@@ -1070,64 +1072,83 @@ def hough_line_transform(img, minLineLength=100, maxLineGap=80,
     taken out.
     """
 
-    #edges = cv2.Canny(img, 50, 150, apertureSize = 3)
-    edges = canny(img, sigma=1.0)
+    edges = cv2.Canny(img, 50, 150, apertureSize = 3)
+    #edges = canny(img, sigma=1.0)
 
     if p_hough:
-        lines = probabilistic_hough_line(edges, threshold=10,
-                                        line_length=minLineLength,
-                                        line_gap=maxLineGap,
-                                        theta=np.pi/30)
-        #lines = cv2.HoughLinesP( edges, 1, np.pi/30, 0,
-        #                            minLineLength,
-        #                            maxLineGap )
+        #lines = probabilistic_hough_line(edges, threshold=100,
+        #                                line_length=minLineLength,
+        #                                line_gap=maxLineGap)
+        lines = cv2.HoughLinesP( edges, 1, np.pi/180, 100,
+                                    minLineLength,
+                                    maxLineGap )
     else:
-        #lines = cv2.HoughLines(edges, 1, np.pi/45, 300)
-        lines = hough_line(edges, theta=np.pi/45)
+        lines = cv2.HoughLines(edges, 1, np.pi/2, 250)
+        #h, theta, d = hough_line(edges)#, theta=np.pi/45)
     # image – 8-bit, lines, rho, theta, threshold, minLineLength, maxLineGap
     # draw mask
     if not p_hough:
         # take the width
         n_arb_reconstruct = img.shape[1]
     img_copy = img.copy()
-
     if lines is not None:
+        if p_hough:
+            print(len(lines))
+            for line in lines:
+                 x1,y1,x2,y2 = line[0]
+                 #p0, p1 = line
+                 #x1 = int(p0[0])
+                 #y1 = int(p0[1])
+                 #x2 = int(p1[0])
+                 #y2 = int(p1[1])
 
-        for line in lines:
-            if p_hough:
-                 #x1,y1,x2,y2 = line[0]
-                 p0,p1 = line
-                 x1 = p0[0]
-                 y1 = p0[1]
-                 x2 = p1[0]
-                 y2 = p1[1]
+                 # only eliminate horizontal lines
+                 diffx = x2 - x1
+                 diffy = y2 - y1
 
-            else:
+                 if not diffx==0:
+                     if np.abs(diffy/diffx) < 1:
 
-                _, theta, dist = zip(*hough_line_peaks(line[0], line[1], line[2])
-                x1 = 0
-                x2 = img_copy.shape[1]
-                y1 = (dist - x1 * np.cos(theta)) / np.sin(theta)
-                y2 = (dist - x2 * np.cos(theta)) / np.sin(theta)
+                         #rr, cc = draw.line(y1, x1, y2, x2)
+                         #img_copy[rr, cc] =  255
+                         cv2.line(img_copy, (x1,y1), (x2,y2), (255, 255, 255), linewidth)
+
+
+        else:
+            #for _, angle, dist in zip(*hough_line_peaks, h, theta, d, threshold=0.2*h.max())):
+
+            for line in lines:
+                for rho, theta in line:
+                #x1 = 1
+                #x2 = img_copy.shape[1] - 1
+                #y1 = int((dist - x1 * np.cos(angle)) / np.sin(angle))
+                #y2 = int((dist - x2 * np.cos(angle)) / np.sin(angle))
                 #_ theta, n_arb_reconstruct = line[0]
-                #a = np.cos(theta)
-                #b = np.sin(theta)
-                #x0 = a*rho
-                #y0 = b*rho
-                #x1 = int(x0 + n_arb_reconstruct*(-b))
-                #y1 = int(y0 + n_arb_reconstruct*(a))
-                #x2 = int(x0 - n_arb_reconstruct*(-b))
-                #y2 = int(y0 - n_arb_reconstruct*(a))
+                    a = np.cos(theta)
+                    b = np.sin(theta)
+                    x0 = a*rho
+                    y0 = b*rho
+                    x1 = int(x0 + n_arb_reconstruct*(-b))
+                    y1 = int(y0 + n_arb_reconstruct*(a))
+                    x2 = int(x0 - n_arb_reconstruct*(-b))
+                    y2 = int(y0 - n_arb_reconstruct*(a))
 
+                    # only eliminate horizontal lines
+                    diffx = x2 - x1
+                    diffy = y2 - y1
 
-            # only eliminate horizontal lines
-            diffx = x2 - x1
-            diffy = y2 - y1
+                    if not diffx==0:
+                        if np.abs(diffy/diffx) < 1:
+                            #y1 = np.clip(y1, 0, img_copy.shape[0] - 1)
+                            #y2 = np.clip(y2, 0, img_copy.shape[0] - 1)
+                            #rr, cc = draw.line(y1, x1, y2, x2)
+                            #img_copy[rr,cc] = 255
+                            cv2.line(img_copy, (x1,y1), (x2,y2), (255, 255, 255), linewidth)
+    if False:
+        fig,ax = plt.subplots(1,2)
+        ax[0].imshow(img, cmap="gray")
+        ax[1].imshow(img_copy, cmap="gray")
+        plt.show()
 
-            if not diffx==0:
-                if np.abs(diffy/diffx) < 1:
-                    pdb.set_trace()
-                    cv2.line(img_copy, (x1,y1), (x2,y2), (255, 255, 255), linewidth,
-                             cv2.LINE_AA)
 
     return img_copy

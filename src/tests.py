@@ -3,12 +3,16 @@ from segmentation import Segmentation
 import matplotlib.pylab as plt
 import matplotlib.patches as patches
 import os
-from config import DIR_PATH, CERT_PATH, RETAINED_FILE_PATH, SEGMENTED_PATH
+from config import DIR_PATH, CERT_PATH, RETAINED_FILE_PATH, SEGMENTED_PATH, A4_100DPI
 from pdf2image import convert_from_path
 import pickle
 import sys
 from PIL import Image
 import pdb
+import cv2
+import numpy as np
+from helper_functions import wordSegmentation
+from image_preprocessing import ImagePreprocessing
 
 class Test:
     def __init__(self, image):
@@ -24,14 +28,25 @@ class Test:
         self.images.append(self.image)
 
     def t_segmentation(self):
-        segmentation = Segmentation(self.image, p_hough=False)
-        segmentation.run()
-        self.image = segmentation.image
+        self.title.append('Before processing')
+        self.images.append(self.image)
+        im_proc = ImagePreprocessing(self.image, p_hough = True)
+        im_proc.process()
+        self.image = im_proc.image
+        new_comp_ = wordSegmentation(self.image, kernelSize=25,
+                                sigma=11, theta=7, minArea=0)
+
+        #segmentation = Segmentation(self.image, p_hough=True)
+        #segmentation.run()
+        #self.image = segmentation.image
         self.title.append('Segmentation')
         self.images.append(self.image)
-        self.title.append('Text lines')
-        self.images.append(segmentation.image_b)
-        self.segmentation = segmentation
+
+        #self.images.append(segmentation.image_b)
+        #self.segmentation = segmentation
+        #self.segmentation.new_components_ = new_comp_
+        self.new_comp_ = new_comp_
+
 
     def _plot(self):
         n_row = len(self.images)
@@ -42,20 +57,25 @@ class Test:
             ax.imshow(self.images[i], cmap='gray')
 
             if self.title[i] == 'Segmentation':
-                for x, y, w, h in self.segmentation.new_components_:
-                    #top left corner, and bottom right conner
+
+                for dim, segment in self.new_comp_:
+                    x, y, w, h = dim
+
+                        #top left corner, and bottom right conner
                     rect = patches.Rectangle((x, y), w, h, linewidth=1,
-                                             edgecolor='r',
-                                             facecolor='none')
+                                                 edgecolor='r',
+                                                 facecolor='none')
                     ax.add_patch(rect)
 
-            if self.title[i] == 'Text lines':
+            elif self.title[i] == 'Text lines':
                 for x, y, w, h in self.segmentation.bboxes_arlsa:
                     #top left corner, and bottom right conner
                     rect = patches.Rectangle((x, y), w, h, linewidth=1,
                                              edgecolor='r',
                                              facecolor='none')
                     ax.add_patch(rect)
+            else:
+                ax.imshow(self.images[i], cmap='gray')
 
         plt.tight_layout()
 
@@ -70,7 +90,7 @@ if __name__ == '__main__':
     try:
         pickle_file = os.path.join(RETAINED_FILE_PATH, sys.argv[1])
     except IndexError:
-        pickle_file = os.path.join(RETAINED_FILE_PATH, 'retained_file_score_1')
+        pickle_file = os.path.join(RETAINED_FILE_PATH, 'retained_file_score_0')
 
     with open(os.path.join(DIR_PATH, pickle_file),'rb') as fp:
         test_files = pickle.load(fp)
@@ -84,6 +104,7 @@ if __name__ == '__main__':
         else:
             img = Image.open(src).convert('L')
 
+        img = cv2.resize(np.asarray(img), A4_100DPI)
         test = Test(img)
         test.run()
         test.fig.savefig(os.path.join(SEGMENTED_PATH, filename.split('.')[0] +'.pdf'))

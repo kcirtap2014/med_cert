@@ -20,19 +20,20 @@ class Resize:
         f = max(fx, fy)
         newSize = (max(min(wt, int(w / f)), 1), max(min(ht, int(h / f)), 1)) # scale according to f (result at least 1 and at most wt or ht)
         #img = rescale(img, newSize)
-        img = resize(img, (wt,ht), anti_aliasing=True)
+        #img = resize(img, (wt,ht), anti_aliasing=False)
         #img = np.uint8(img)
-        #target = np.ones([ht, wt]) * 255
-        #target[0:newSize[1], 0:newSize[0]] = img
+        img = cv2.resize(img, newSize)
+        target = np.ones([ht, wt]) * 255
+        target[0:newSize[1], 0:newSize[0]] = img
 
         # transpose for TF
-        #img = cv2.transpose(target)
+        img = cv2.transpose(target)
 
         # normalize
-        #(m, s) = cv2.meanStdDev(img)
-        #m = m[0][0]
-        #s = s[0][0]
-        #img = img - m
-        #img = img / s if s>0 else img
+        (m, s) = cv2.meanStdDev(img)
+        m = m[0][0]
+        s = s[0][0]
+        img = img - m
+        img = img / s if s>0 else img
 
         return img

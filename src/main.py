@@ -19,6 +19,8 @@ from resize import Resize
 from segmentation import Segmentation
 from helper_functions import (text_preprocess, trim, keyword_lookup)
 from image_preprocessing import ImagePreprocessing
+from skimage.transform import resize
+
 #### To use directly in python , set working directory to contain helper_functions.py and the directory containing certificates
 #### os.chdir("Desktop/Certificats/Cert_Recognition/")
 
@@ -46,14 +48,12 @@ if __name__ == '__main__':
     with open(retained_file_list,'rb') as fp:
         sorted_file_list = pickle.load(fp)
 
-    m_resizer = Resize(A4_100DPI)
-
     # import model
     model = Model(open(char_list).read(), decoderType,
                        mustRestore=True)
     print(open(char_acc_file).read())
 
-    for i, file in enumerate(sorted_file_list[1:2]):
+    for i, file in enumerate(sorted_file_list[5:6]):
         filename = os.fsdecode(file)
         src = os.path.join(CERT_PATH, filename)
         print("%d:%s"%(i,filename))
@@ -72,9 +72,9 @@ if __name__ == '__main__':
             img = convert_from_path(src, fmt="png")[0].convert('L')
         # resize image
         print(np.shape(img))
-        img = m_resizer.transform(np.array(img))
-        print("after", img.shape)
-        pdb.set_trace()
+        img = cv2.resize(np.asarray(img), A4_100DPI)
+        print("after", np.shape(img))
+
         # Setting variables for the loop
         option = 0
         #img2 = copy(img)
@@ -105,19 +105,45 @@ if __name__ == '__main__':
         l_segmentation = True
 
         if l_segmentation:
-
-            segmentation = Segmentation(img, p_hough=False)
+            resizer = Resize(Model.imgSize)
+            segmentation = Segmentation(img, p_hough = True)
             segmentation.run()
-            img = segmentation.image
+            seg_img = segmentation.image
+            img_new_comp_ = segmentation.new_components_
+
+            for dim, segment in img_new_comp_:
+                sub_image = segment
+                if not sub_image.size==0:
+                    resize_img = resizer.transform(sub_image)
+                    #resize_img = resize(sub_image, (wt,ht),
+                    #                        anti_aliasing=True)
+
+                    batch = Batch(None, [resize_img] * Model.batchSize) # fill all batch elements with same
+                    recognized = model.inferBatch(batch) # recognize text
+                    print('Recognized:', '"' + recognized[0] + '"') # all batch elements  hold same result
+                    if len(recognized[0])>2:
+                        fig,ax = plt.subplots(2,1)
+                        ax[0].imshow(sub_image,cmap="gray")
+                        ax[1].imshow(resize_img,cmap="gray")
+                        plt.show()
+                    
+        else:
+
+            segmentation = Segmentation(img, p_hough = True)
+            segmentation.run()
+            seg_img = segmentation.image
             img_new_comp_ = segmentation.new_components_
             print("Num components:", len(img_new_comp_))
             (wt,ht) = Model.imgSize
+            resizer = Resize(Model.imgSize)
 
             for i, (x,y,w,h) in enumerate(img_new_comp_):
-                sub_image = img[y:y+h, x:x+w]
+                sub_image = seg_img[y:y+h, x:x+w]
 
                 if not sub_image.size==0:
-                    resize_img = resize(sub_image, (wt,ht), anti_aliasing=True)
+                    resize_img = resizer.transform(sub_image)
+                    #resize_img = resize(sub_image, (wt,ht),
+                    #                        anti_aliasing=True)
 
                     batch = Batch(None, [resize_img] * Model.batchSize) # fill all batch elements with same
                     recognized = model.inferBatch(batch) # recognize text

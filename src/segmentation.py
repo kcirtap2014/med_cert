@@ -2,7 +2,8 @@ import numpy as np
 import cv2
 import matplotlib.patches as patches
 from PIL import Image
-from helper_functions import (consecutive_key, horizontal_clustering)
+from helper_functions import (consecutive_key, horizontal_clustering,
+                             wordSegmentation)
 from thresholding import Thresholding
 from image_preprocessing import ImagePreprocessing
 import pdb
@@ -11,7 +12,7 @@ class Segmentation:
     def __init__(self, image, morph_close_kernel = (2,2), Th = 3.5,
                 connectivity = 8, erode_kernel = (2,2),
                 dilate_kernel = (3,3),
-                aTl = 5, aTo = 0.4, p_hough = False):
+                aTl = 10, aTo = 0.4, p_hough = True):
         self.image = np.array(image)
         self.morph_close_kernel = np.ones(morph_close_kernel,np.uint8)
         self.erode_kernel = np.ones(erode_kernel,np.uint8)
@@ -290,19 +291,26 @@ class Segmentation:
 
         # Step 3: Median blur
         img = imgproc.image#cv2.medianBlur(cv2.bitwise_not(img), 5)
+        new_comp_ = wordSegmentation(img, kernelSize=25,
+                                sigma=11, theta=7, minArea=0)
+        self.image = img
+        self.new_components_ = new_comp_
+
         ##cv2.medianBlur(cv2.bitwise_not(img), 5)
 
         # Step 4: Connected components
-        n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img,
-         self.connectivity, cv2.CV_32S)
-        bboxes = self.filter_stats_CC(img, stats)
 
-        # Step 5: ARLSA
-        groups = horizontal_clustering(bboxes)
-        img_w, img_b = self.arlsa(img, bboxes, groups)
-        n_labels_arlsa, labels_arlsa, stats_arlsa, centroids_arlsa = cv2.connectedComponentsWithStats(cv2.bitwise_not(img_b), self.connectivity, cv2.CV_32S)
-        self.bboxes_arlsa = self.filter_stats_CC(img_b, stats_arlsa)#,l_filter=False)
-        # Step 6: Text block segmentation
-        self.new_components_ = self.word_segmentation(img, self.bboxes_arlsa)
-        self.image = img
-        self.image_b = img_b
+        if False:
+            n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img,
+             self.connectivity, cv2.CV_32S)
+            bboxes = self.filter_stats_CC(img, stats)
+
+            # Step 5: ARLSA
+            groups = horizontal_clustering(bboxes)
+            img_w, img_b = self.arlsa(img, bboxes, groups)
+            n_labels_arlsa, labels_arlsa, stats_arlsa, centroids_arlsa = cv2.connectedComponentsWithStats(cv2.bitwise_not(img_b), self.connectivity, cv2.CV_32S)
+            self.bboxes_arlsa = self.filter_stats_CC(img_b, stats_arlsa,l_filter=False)
+            # Step 6: Text block segmentation
+            self.new_components_ = self.word_segmentation(img, self.bboxes_arlsa)
+            self.image = img
+            self.image_b = img_b

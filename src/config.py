@@ -35,4 +35,4 @@ file_list = [f for f in os.listdir(CERT_PATH) if f.endswith(ext)]
 C_KEYWORDS = [("athle", "running", "course", "pied", "compétition",
                  "athlétisme", "semi-marathon", "marathon")]
 BEGIN_DATE = '17/2/2018'
-A4_100DPI = (842, 596)
+A4_100DPI = (1240, 1754)#(596, 842)
