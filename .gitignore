@@ -19,3 +19,4 @@ src/segmentation_m.py
 src/__pycache__
 src/TFWordBeamSearch.so
 src/.DS_Store
+src/rlsa.py
