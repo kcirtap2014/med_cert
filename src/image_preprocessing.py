@@ -6,7 +6,7 @@ from helper_functions import (rotation, hough_line_transform)
 class ImagePreprocessing:
 
     def __init__(self, image, verbose=False, p_hough = False, minLineLength = 50,
-                 maxLineGap = 30, linewidth=3, graph_line=True, morphology=True,
+                 maxLineGap = 30, linewidth=1, graph_line=True, morphology=True,
                  option=0, morphology_kernel=(3,3)):
         self.verbose = verbose
         self.image = np.array(image)

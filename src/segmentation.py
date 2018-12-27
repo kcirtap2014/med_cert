@@ -6,6 +6,7 @@ from helper_functions import (consecutive_key, horizontal_clustering,
                              wordSegmentation)
 from thresholding import Thresholding
 from image_preprocessing import ImagePreprocessing
+import matplotlib.pylab as plt
 import pdb
 
 class Segmentation:
@@ -291,8 +292,14 @@ class Segmentation:
 
         # Step 3: Median blur
         img = imgproc.image#cv2.medianBlur(cv2.bitwise_not(img), 5)
+        n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img,
+         self.connectivity, cv2.CV_32S)
+        bboxes = self.filter_stats_CC(img, stats)
+
+        sigma = int(np.median([h for x,y,w,h  in bboxes]))
+
         new_comp_ = wordSegmentation(img, kernelSize=25,
-                                sigma=11, theta=7, minArea=0)
+                                     sigma=sigma, theta=5, minArea=0)
         self.image = img
         self.new_components_ = new_comp_
 

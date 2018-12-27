@@ -110,7 +110,7 @@ if __name__ == '__main__':
             segmentation.run()
             seg_img = segmentation.image
             img_new_comp_ = segmentation.new_components_
-
+            print("Num components:", len(img_new_comp_))
             for dim, segment in img_new_comp_:
                 sub_image = segment
                 if not sub_image.size==0:
@@ -121,19 +121,19 @@ if __name__ == '__main__':
                     batch = Batch(None, [resize_img] * Model.batchSize) # fill all batch elements with same
                     recognized = model.inferBatch(batch) # recognize text
                     print('Recognized:', '"' + recognized[0] + '"') # all batch elements  hold same result
-                    if len(recognized[0])>2:
+                    if False: #len(recognized[0])>2:
                         fig,ax = plt.subplots(2,1)
                         ax[0].imshow(sub_image,cmap="gray")
                         ax[1].imshow(resize_img,cmap="gray")
                         plt.show()
-                    
+
         else:
 
             segmentation = Segmentation(img, p_hough = True)
             segmentation.run()
             seg_img = segmentation.image
             img_new_comp_ = segmentation.new_components_
-            print("Num components:", len(img_new_comp_))
+
             (wt,ht) = Model.imgSize
             resizer = Resize(Model.imgSize)
 
@@ -148,7 +148,7 @@ if __name__ == '__main__':
                     batch = Batch(None, [resize_img] * Model.batchSize) # fill all batch elements with same
                     recognized = model.inferBatch(batch) # recognize text
                     print('Recognized:', '"' + recognized[0] + '"') # all batch elements  hold same result
-                    if len(recognized[0])>2:
+                    if False:
                         fig,ax = plt.subplots(2,1)
                         ax[0].imshow(sub_image,cmap="gray")
                         ax[1].imshow(resize_img,cmap="gray")

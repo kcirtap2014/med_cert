@@ -3,7 +3,8 @@ import numpy as np
 import cv2
 import sys
 import pdb
-sys.path.append('/Users/pmlee/Documents/FRP/Cert_Recognition/Cert_Recognition')
+import matplotlib.pylab as plt
+from image_preprocessing import ImagePreprocessing
 
 def preprocess(img, imgSize, dataAugmentation=False):
     "put img into target img of size imgSize, transpose for TF and normalize gray-values"
@@ -17,10 +18,11 @@ def preprocess(img, imgSize, dataAugmentation=False):
         stretch = (random.random() - 0.5) # -0.5 .. +0.5
         wStretched = max(int(img.shape[1] * (1 + stretch)), 1) # random width, but at least 1
         img = cv2.resize(img, (wStretched, img.shape[0])) # stretch horizontally by factor 0.5 .. 1.5
-
-
-    # increase contrast
-    img = image_preprocessing(img)
+        
+    # Process it identically when infering
+    imgProc = ImagePreprocessing(img)
+    imgProc.process()
+    img = imgProc.image
 
     #cv2.namedWindow('image', cv2.WINDOW_NORMAL)
     #cv2.imshow('image',img)
@@ -48,4 +50,5 @@ def preprocess(img, imgSize, dataAugmentation=False):
     s = s[0][0]
     img = img - m
     img = img / s if s>0 else img
+
     return img

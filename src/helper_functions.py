@@ -606,18 +606,22 @@ def wordSegmentation(img, kernelSize=25, sigma=11, theta=7, minArea=0):
         img: grayscale uint8 image of the text-line to be segmented.
         kernelSize: size of filter kernel, must be an odd integer.
         sigma: standard deviation of Gaussian function used for filter kernel.
-        theta: approximated width/height ratio of words, filter function is distorted by this factor.
+        theta: approximated width/height ratio of words, filter function is distorted by this factor.Experimentally was found thatsigma is a function of the height of the words (which is related to the height of the line).
         minArea: ignore word candidates smaller than specified area.
 
     Returns:
         List of tuples. Each tuple contains the bounding box and the image of the segmented word.
     """
-
     # apply filter kernel
     kernel = createKernel(kernelSize, sigma, theta)
     imgFiltered = cv2.filter2D(img, -1, kernel, borderType=cv2.BORDER_REPLICATE).astype(np.uint8)
     (_, imgThres) = cv2.threshold(imgFiltered, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     imgThres = 255 - imgThres
+    dilationKernel = tuple((np.ones(2)*sigma).astype(int))
+    # increase the dilation
+    se = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, dilationKernel)
+    imgThres  = cv2.morphologyEx(imgThres, cv2.MORPH_CLOSE, se, iterations=1)
+    #imgThres = cv2.dilate(imgThres, dilationKernel, iterations = 1)
 
     # find connected components. OpenCV: return type differs between OpenCV2 and 3
     if cv2.__version__.startswith('3.'):
@@ -627,8 +631,10 @@ def wordSegmentation(img, kernelSize=25, sigma=11, theta=7, minArea=0):
 
     # append components to result
     res = []
+
     for c in components:
         # skip small word candidates
+
         if cv2.contourArea(c) < minArea:
             continue
         # append bounding box and image of word to result list
@@ -1083,6 +1089,7 @@ def hough_line_transform(img, minLineLength=100, maxLineGap=80,
                                     minLineLength,
                                     maxLineGap )
     else:
+
         lines = cv2.HoughLines(edges, 1, np.pi/2, 250)
         #h, theta, d = hough_line(edges)#, theta=np.pi/45)
     # image – 8-bit, lines, rho, theta, threshold, minLineLength, maxLineGap
@@ -1093,7 +1100,7 @@ def hough_line_transform(img, minLineLength=100, maxLineGap=80,
     img_copy = img.copy()
     if lines is not None:
         if p_hough:
-            print(len(lines))
+
             for line in lines:
                  x1,y1,x2,y2 = line[0]
                  #p0, p1 = line
@@ -1116,7 +1123,7 @@ def hough_line_transform(img, minLineLength=100, maxLineGap=80,
 
         else:
             #for _, angle, dist in zip(*hough_line_peaks, h, theta, d, threshold=0.2*h.max())):
-
+            
             for line in lines:
                 for rho, theta in line:
                 #x1 = 1
@@ -1149,6 +1156,5 @@ def hough_line_transform(img, minLineLength=100, maxLineGap=80,
         ax[0].imshow(img, cmap="gray")
         ax[1].imshow(img_copy, cmap="gray")
         plt.show()
-
 
     return img_copy

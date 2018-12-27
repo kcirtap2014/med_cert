@@ -30,22 +30,22 @@ class Test:
     def t_segmentation(self):
         self.title.append('Before processing')
         self.images.append(self.image)
-        im_proc = ImagePreprocessing(self.image, p_hough = True)
-        im_proc.process()
-        self.image = im_proc.image
-        new_comp_ = wordSegmentation(self.image, kernelSize=25,
-                                sigma=11, theta=7, minArea=0)
+        #im_proc = ImagePreprocessing(self.image, p_hough = True)
+        #im_proc.process()
+        #self.image = im_proc.image
+        #new_comp_ = wordSegmentation(self.image, kernelSize=21,
+        #                        sigma=11, theta=7, minArea=100)
 
-        #segmentation = Segmentation(self.image, p_hough=True)
-        #segmentation.run()
-        #self.image = segmentation.image
+        segmentation = Segmentation(self.image, p_hough=False)
+        segmentation.run()
+        self.image = segmentation.image
         self.title.append('Segmentation')
         self.images.append(self.image)
 
         #self.images.append(segmentation.image_b)
         #self.segmentation = segmentation
         #self.segmentation.new_components_ = new_comp_
-        self.new_comp_ = new_comp_
+        self.new_comp_ = segmentation.new_components_
 
 
     def _plot(self):
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     try:
         pickle_file = os.path.join(RETAINED_FILE_PATH, sys.argv[1])
     except IndexError:
-        pickle_file = os.path.join(RETAINED_FILE_PATH, 'retained_file_score_0')
+        pickle_file = os.path.join(RETAINED_FILE_PATH, 'retained_file_score_3')
 
     with open(os.path.join(DIR_PATH, pickle_file),'rb') as fp:
         test_files = pickle.load(fp)
