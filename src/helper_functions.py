@@ -1066,7 +1066,7 @@ def horizontal_clustering(components, bin_limit=40):
     return groups
 
 def hough_line_transform(img, minLineLength=100, maxLineGap=80,
-                         p_hough=False, linewidth=2):
+                         p_hough=False, linewidth=4):
     """
     Hough line transformation to get rid of lines. Only horizontal lines are
     taken out.

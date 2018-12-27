@@ -277,7 +277,7 @@ class Segmentation:
 
         img = self.image.copy()
 
-        imgproc = ImagePreprocessing(img, verbose=verbose, p_hough = self.p_hough)
+        imgproc = ImagePreprocessing(img, verbose=verbose)
         imgproc.process()
         # Morphological closing
         #linek = np.zeros((11,11),dtype=np.uint8)
