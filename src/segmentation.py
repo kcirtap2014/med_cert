@@ -8,6 +8,7 @@ from thresholding import Thresholding
 from image_preprocessing import ImagePreprocessing
 import matplotlib.pylab as plt
 import pdb
+from louloudis import Louloudis
 
 class Segmentation:
     def __init__(self, image, morph_close_kernel = (2,2), Th = 3.5,
@@ -278,7 +279,8 @@ class Segmentation:
 
         img = self.image.copy()
 
-        imgproc = ImagePreprocessing(img, verbose=verbose)
+        imgproc = ImagePreprocessing(img, verbose=verbose, graph_line=True,
+                                     morphology=True)
         imgproc.process()
         # Morphological closing
         #linek = np.zeros((11,11),dtype=np.uint8)
@@ -292,6 +294,11 @@ class Segmentation:
 
         # Step 3: Median blur
         img = imgproc.image#cv2.medianBlur(cv2.bitwise_not(img), 5)
+        louloudis = Louloudis(img)
+        louloudis.preprocess()
+        louloudis.hough_transform()
+
+
         n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img,
          self.connectivity, cv2.CV_32S)
         bboxes = self.filter_stats_CC(img, stats)

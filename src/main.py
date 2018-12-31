@@ -18,10 +18,14 @@ from config import (DIR_PATH, df_exp, file_list, C_KEYWORDS, BEGIN_DATE,
 from resize import Resize
 from segmentation import Segmentation
 from helper_functions import (text_preprocess, trim, keyword_lookup,
-                              feature_engineering,find_cluster)
+                              feature_engineering, find_cluster,
+                              horizontal_clustering)
 from image_preprocessing import ImagePreprocessing
 from skimage.transform import resize
 from collections import defaultdict
+from joblib import load
+from filepaths import FilePaths
+
 
 #### To use directly in python , set working directory to contain helper_functions.py and the directory containing certificates
 #### os.chdir("Desktop/Certificats/Cert_Recognition/")
@@ -40,8 +44,8 @@ if __name__ == '__main__':
     verbose  = bool(args.verbose)
 
     # some flags
-    char_acc_file = os.path.join(MODEL_PATH,'accuracy.txt')
-    char_list = os.path.join(MODEL_PATH,'charList.txt')
+    char_acc_file = FilePaths.fnAccuracy
+    char_list = FilePaths.fnCharList
     retained_file_list = os.path.join(RETAINED_FILE_PATH,'retained_file_score_0')
     decoderType = DecoderType.WordBeamSearch
     #keywords_preprocessed = []
@@ -52,20 +56,21 @@ if __name__ == '__main__':
         sorted_file_list = pickle.load(fp)
 
     # import model
-    model = Model(open(char_list).read(), decoderType,
-                       mustRestore=True)
+    model = Model(open(char_list).read(), decoderType, mustRestore=True)
+    print("Model loaded")
     kmeans = load(os.path.join(MODEL_PATH,'kmeans.joblib'))
+    print("Kmeans for text/manuscript distinction loaded")
     clf = load(os.path.join(MODEL_PATH,'clf_lr.joblib'))
+    print("SVM for text/manuscript distinction loaded")
 
     print(open(char_acc_file).read())
 
-    for i, file in enumerate(sorted_file_list[5:6]):
+    for i, file in enumerate(sorted_file_list[0:1]):
         # some default dicts to store information
-        cert_features = defaultdict()
-        resize_images = defaultdict()
-        dimensions = defaultdict()
+        cert_features = []
+        resize_images = []
+        dimensions = []
         X_cert = []
-        index_X_cert = []
 
         filename = os.fsdecode(file)
         src = os.path.join(CERT_PATH, filename)
@@ -79,13 +84,16 @@ if __name__ == '__main__':
                 im_temp = Image.open(src).convert('L')
                 # crop white space
                 im_temp.save(src_pdf, "pdf", optimize=True, quality=85)
-
-            img = convert_from_path(src_pdf, fmt="png")[0].convert('L')
+            #img = cv2.imread(src_pdf)
+            img = convert_from_path(src_pdf, fmt="png")[0]#.convert('L')
+            img = cv2.cvtColor(np.array(img), cv2.COLOR_BGR2GRAY)
         else:
-            img = convert_from_path(src, fmt="png")[0].convert('L')
+            img = convert_from_path(src, fmt="png")[0]#.convert('L')
+            img = cv2.cvtColor(np.array(img), cv2.COLOR_BGR2GRAY)
+
         # resize image
         print(np.shape(img))
-        img = cv2.resize(np.asarray(img), A4_100DPI)
+        img = cv2.resize(img, A4_100DPI)
         print("after", np.shape(img))
 
         # Setting variables for the loop
@@ -118,6 +126,7 @@ if __name__ == '__main__':
         l_segmentation = True
 
         if l_segmentation:
+            txt = ""
             resizer = Resize(Model.imgSize)
             segmentation = Segmentation(img, p_hough = True)
             segmentation.run()
@@ -125,7 +134,7 @@ if __name__ == '__main__':
             img_new_comp_ = segmentation.new_components_
             print("Num components:", len(img_new_comp_))
 
-            for dim, segment in img_new_comp_:
+            for i, (dim, segment) in enumerate(img_new_comp_):
                 sub_image = segment
 
                 if not sub_image.size==0:
@@ -134,39 +143,56 @@ if __name__ == '__main__':
                                                  l_hog=False)
 
                     if not output[0] is None:
-                        cert_features[i] = output[0]
-                        resize_images[i] = resize_img
-                        dimensions[i] = dim
-            # sort dimension here
-            groups = horizontal_clustering(dimensions)
+                        cert_features.append(output[0])
+                        resize_images.append(resize_img)
+                        dimensions.append(dim)
 
-            for key, features in cert_features.items():
+            # create a sorted index based on dimensions
+            index_cert = horizontal_clustering(dimensions)
+
+            for features in cert_features:
                 bovw_feature_cert = find_cluster(kmeans, features)
                 X_cert.append(bovw_feature_cert)
-                index_X_cert.append(key)
 
             y_pred_cert = clf.predict(np.array(X_cert))
-            pdb.set_trace()
-            for key, index in groups.items():
-                for i in index:
-                    if y_pred_cert[i]:
-                        batch = Batch(None, [resize_images[i]] * Model.batchSize) # fill all batch elements with same
-                        recognized = model.inferBatch(batch) # recognize text
-                        txt += str(recognized[0])
+            # mapping
+            index_hand = [index_cert[i] for i, pred in enumerate(y_pred_cert)]# if pred==False ]
 
-                        if len(recognized[0])>1:
-                            txt += " "
-                        #print('Recognized:', '"' + recognized[0] + '"') # all batch elements  hold same result
-                        if False: #len(recognized[0])>2:
-                            fig,ax = plt.subplots(2,1)
-                            ax[0].imshow(sub_image,cmap="gray")
-                            ax[1].imshow(resize_img,cmap="gray")
-                            plt.show()
+            infer_resize_images = list(np.array(resize_images)[index_hand])
+            #index_hand = index_cert
+            print("Num handwritten words:%d" %(len(index_hand)))
+
+            freq = Model.batchSize
+            # add black image to compete the batch
+            infer_resize_images += list(np.zeros([freq - len(infer_resize_images)%freq,
+                                            Model.imgSize[0], Model.imgSize[1]]))
+            current_id = 0
+            current_turn = 0
+            n_images = len(infer_resize_images)
+            n_turn = int(n_images/Model.batchSize)
+
+            while current_turn < n_turn:
+
+                batch = Batch(None, np.array(infer_resize_images)[current_id:freq])
+                # fill all batch elements with same
+                recognized = model.inferBatch(batch) # recognize text
+                txt += " ".join(recognized)
+
+                current_id = freq
+                current_turn += 1
+                freq += freq
+
+            #print('Recognized:', '"' + recognized[0] + '"') # all batch elements  hold same result
+            if False: #len(recognized[0])>2:
+                fig,ax = plt.subplots(2,1)
+                ax[0].imshow(sub_image,cmap="gray")
+                ax[1].imshow(resize_img,cmap="gray")
+                plt.show()
+
             print(txt)
             pdb.set_trace()
 
         else:
-
             segmentation = Segmentation(img, p_hough = True)
             segmentation.run()
             seg_img = segmentation.image

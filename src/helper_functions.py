@@ -431,7 +431,7 @@ def replace_month(date):
 
     return std_date
 
-def rotation(im):
+def rotation(img):
     """
     rotate image if height < width
 
@@ -443,15 +443,48 @@ def rotation(im):
     -------
     resulting image
     """
+    if False:
+        ## (2) threshold
+        th, threshed = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY_INV|cv2.THRESH_OTSU)
+        ## (3) minAreaRect on the nozeros
+        pts = cv2.findNonZero(threshed)
+        ret = cv2.minAreaRect(pts)
 
-    height, width = im.shape
+        (cx,cy), (w,h), ang = ret
+        if w>h:
+            w,h = h,w
+            ang += 90
 
-    if height < width:
-        new_im = np.rot90(im, k=-1)
+        ## (4) Find rotated matrix, do rotation
+        #pdb.set_trace()
+        M = cv2.getRotationMatrix2D((cx,cy), ang, 1.0)
+        rotated = cv2.warpAffine(threshed, M, (img.shape[1], img.shape[0]))
+
+        ## (5) find and draw the upper and lower boundary of each lines
+        hist = cv2.reduce(rotated,1, cv2.REDUCE_AVG).reshape(-1)
+
+        th = 2
+        H,W = img.shape[:2]
+        uppers = [y for y in range(H-1) if hist[y]<=th and hist[y+1]>th]
+        lowers = [y for y in range(H-1) if hist[y]>th and hist[y+1]<=th]
+
+        rotated = cv2.cvtColor(rotated, cv2.COLOR_GRAY2BGR)
+
+        for y in uppers:
+            cv2.line(rotated, (0,y), (W, y), (255,0,0), 1)
+
+        for y in lowers:
+            cv2.line(rotated, (0,y), (W, y), (0,255,0), 1)
     else:
-        new_im = im
 
-    return new_im
+        height, width = img.shape
+
+        if height < width:
+            rotated = np.rot90(im, k=-1)
+        else:
+            rotated = img
+
+    return rotated
 
 def create_ngram(txt, n=2, l_text=True):
     """
@@ -768,8 +801,8 @@ def feature_engineering(img, step=32, radius=32, histograms=8, orientations=8,
     """
 
     #mat_img_filter = image_preprocessing(img)
-    mat_img = np.array(img)
-    mat_img_filter = filters.median(mat_img)
+    #mat_img = np.array(img)
+    #mat_img_filter = filters.median(mat_img)
     output = []
 
     if l_hog:
@@ -819,13 +852,16 @@ def feature_engineering(img, step=32, radius=32, histograms=8, orientations=8,
         #median_blur_img = cv2.medianBlur(img_gray, ksize=1)
 
         # equalizer: contrast adjustment
-        img_eq = cv2.equalizeHist(img)
+        #img_eq = cv2.equalizeHist(img)
 
-        kp, descs = sift.detectAndCompute(img_eq, None)
+        # make sure that it's an 8 bit image
+        entry_img = cv2.bitwise_not(img.astype('uint8'))
+        kp, descs = sift.detectAndCompute(entry_img, None)
+
         output_sift = descs
 
         if visualize:
-            img_sift = cv2.drawKeypoints(img_eq, kp, None,
+            img_sift = cv2.drawKeypoints(entry_img, kp, None,
                                          flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
             output_sift = descs, img_sift
 
@@ -1044,8 +1080,8 @@ def horizontal_clustering(components, bin_limit=40):
 
     Returns:
     --------
-    groups: defaultdict
-        grouped dict of arrays of (x,y,w,h)
+    index_df: list
+        contains index of the components
     """
 
     x, y, w, h = zip(*components)
@@ -1056,20 +1092,19 @@ def horizontal_clustering(components, bin_limit=40):
         num_bins += 1
 
     bins = np.linspace(np.min(y), np.max(y), num=num_bins, endpoint=True)
+    df = pd.DataFrame(list(zip(x,y)),columns = ["x","y"])
     # group by mean of the height
-    cut_vals = pd.cut(
-        y,
-        #np.ceil(np.array(y) + np.array(h)/2.),
+    df["grouped_y"] = pd.cut(
+        #y,
+        np.ceil(np.array(y) + np.array(h)/2.),
         bins=bins,
         include_lowest=True,
         labels = np.arange(num_bins - 1).astype(int))
 
-    groups = defaultdict(list)
+    sorted_df = df.sort_values(['grouped_y', 'x'])
+    index_df = sorted_df.index.tolist()
 
-    for i, group in enumerate(cut_vals):
-        groups[group].append(i)
-
-    return groups
+    return index_df
 
 def hough_line_transform(img, minLineLength=100, maxLineGap=80,
                          p_hough=False, linewidth=4):
@@ -1123,7 +1158,7 @@ def hough_line_transform(img, minLineLength=100, maxLineGap=80,
 
         else:
             #for _, angle, dist in zip(*hough_line_peaks, h, theta, d, threshold=0.2*h.max())):
-            
+
             for line in lines:
                 for rho, theta in line:
                 #x1 = 1

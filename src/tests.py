@@ -90,7 +90,7 @@ if __name__ == '__main__':
     try:
         pickle_file = os.path.join(RETAINED_FILE_PATH, sys.argv[1])
     except IndexError:
-        pickle_file = os.path.join(RETAINED_FILE_PATH, 'retained_file_score_3')
+        pickle_file = os.path.join(RETAINED_FILE_PATH, 'retained_file_score_0')
 
     with open(os.path.join(DIR_PATH, pickle_file),'rb') as fp:
         test_files = pickle.load(fp)

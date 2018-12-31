@@ -24,11 +24,12 @@ class ImagePreprocessing:
     def process(self):
 
         self.image = rotation(self.image)
-
         # thresholding
         thresh = Thresholding(self.image, option=self.option)
         thresh.run(verbose=self.verbose)
+
         self.image = thresh.image
+
 
         if self.graph_line:
             # Step 1: Graphical line removal

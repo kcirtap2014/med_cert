@@ -4,7 +4,7 @@ from helper_functions import detect_peaks
 import pdb
 
 class Thresholding:
-    def __init__(self, image, verbose=False, gauss_blur_kernel=(3,3),
+    def __init__(self, image, verbose=False, gauss_blur_kernel=(1,1),
                 adapt_thresh_blocksize=19, adapt_thresh_C=20, option=0):
         self.image = np.array(image)
         self.gauss_blur_kernel = gauss_blur_kernel
@@ -61,8 +61,8 @@ class Thresholding:
             if verbose:
                 print(peaks, self.method[self.option])
             # use otsu when there is a distinctive amplitude (1 order of magnitude difference at least)
-            blur = cv2.GaussianBlur(self.image, self.gauss_blur_kernel, 0)
-            self.ret, self.image = cv2.threshold(blur, 0, 255,
+            #blur = cv2.GaussianBlur(self.image, self.gauss_blur_kernel, 0)
+            self.ret, self.image = cv2.threshold(self.image, 0, 255,
                                         cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
             if verbose:
