@@ -480,7 +480,7 @@ def rotation(img):
         height, width = img.shape
 
         if height < width:
-            rotated = np.rot90(im, k=-1)
+            rotated = np.rot90(img, k=-1)
         else:
             rotated = img
 

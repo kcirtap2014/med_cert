@@ -95,6 +95,8 @@ if __name__ == '__main__':
         print(np.shape(img))
         img = cv2.resize(img, A4_100DPI)
         print("after", np.shape(img))
+        # take only a small part of the image
+        #img = img[625:875,700:900]
 
         # Setting variables for the loop
         option = 0
